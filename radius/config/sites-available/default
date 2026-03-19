@@ -70,7 +70,7 @@ preacct {
 
 accounting {
     detail
-    -sql
+    sql
     exec
     attr_filter.accounting_response
     
@@ -94,7 +94,7 @@ post-auth {
         &reply: += &session-state:
     }
 
-    -sql
+    sql
     exec
     remove_reply_message_if_eap
 
