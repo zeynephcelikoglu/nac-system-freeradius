@@ -1,7 +1,5 @@
-fastapi[standard]
-uvicorn
-sqlalchemy
-psycopg2-binary
-redis
-python-dotenv
+fastapi
+uvicorn[standard]
+redis[asyncio]
 passlib[bcrypt]
+asyncpg

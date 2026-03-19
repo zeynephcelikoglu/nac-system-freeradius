@@ -1,0 +1,9 @@
+FROM freeradius/freeradius-server:latest-3.2
+
+RUN apt-get update && apt-get install -y \
+    freeradius-rest \
+    freeradius-postgresql \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN chown -R freerad:freerad /etc/freeradius

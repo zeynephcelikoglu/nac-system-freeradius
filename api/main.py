@@ -1,100 +1,105 @@
-import redis
-import json
-from typing import Optional, Dict
-from fastapi import FastAPI, Depends, HTTPException, status, Body
-from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+from fastapi import FastAPI, Request, Response
+from contextlib import asynccontextmanager
+import asyncpg
+import os
 
-# Import local modules
-from database import get_db
-from models import RadCheck
-from schemas import AuthRequest, AuthResponse
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize database connection pool on startup
+    app.state.db = await asyncpg.create_pool(os.environ["DATABASE_URL"])
+    yield
+    # Close database pool on shutdown
+    await app.state.db.close()
 
-app = FastAPI(title="NAC Policy Engine")
-
-# Redis connection setup
-redis_client = redis.Redis(host="nac_redis", port=6379, db=0, decode_responses=True)
-
-# Password hashing configuration for secure credential verification
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
-def health_check():
-    """Simple health check endpoint to verify API status."""
-    return {"status": "NAC API is running", "version": "1.0.0"}
+async def health():
+    # Simple health check endpoint
+    return {"status": "ok"}
+
+@app.post("/authorize")
+async def authorize(request: Request):
+    """
+    Step 1: Authorization
+    Checks user group and assigns the correct VLAN ID
+    """
+    body = await request.json()
+    username = body.get("User-Name") or body.get("username")
+
+    if not username:
+        return Response(status_code=401)
+
+    # Fetch user's group from the database
+    async with app.state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT groupname FROM radusergroup WHERE username = $1 LIMIT 1",
+            username,
+        )
+
+    # Map groups to specific VLAN IDs (Default to Guest VLAN 30)
+    vlan_map = {"admin": "10", "employee": "20", "guest": "30"}
+    vlan_id = vlan_map.get(row["groupname"] if row else None, "30")
+
+    # Return standard RADIUS attributes for VLAN assignment
+    return {
+        "Tunnel-Type": "13",
+        "Tunnel-Medium-Type": "6",
+        "Tunnel-Private-Group-Id": vlan_id,
+    }
 
 @app.post("/auth")
-def authenticate_user(request: AuthRequest, db: Session = Depends(get_db)):
+async def auth(request: Request):
     """
-    Handles RADIUS Access-Request.
-    Verifies user credentials against PostgreSQL and returns dynamic VLAN policy.
+    Step 2: Authentication
+    Validates the user password against the database
     """
-    # Query user from the radcheck table in PostgreSQL
-    user = db.query(RadCheck).filter(RadCheck.username == request.username).first()
+    body = await request.json()
+    print("AUTH BODY:", body) # Log incoming request for debugging
 
-    # Verify user existence and password match
-    if not user or request.password != user.value:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Return standard RADIUS attributes for dynamic VLAN assignment
-    return {
-        "Tunnel-Type": "VLAN",
-        "Tunnel-Medium-Type": "IEEE-802",
-        "Tunnel-Private-Group-Id": "10" 
-    }
+    username = body.get("username") or body.get("User-Name")
+    password = body.get("password") or body.get("User-Password")
+
+    if not username or not password:
+        return Response(status_code=401)
+
+    # Verify Cleartext-Password from radcheck table
+    async with app.state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT value FROM radcheck
+            WHERE username = $1 AND attribute = 'Cleartext-Password'
+            LIMIT 1
+            """,
+            username,
+        )
+
+    # Check if user exists and password matches
+    if not row or password != row["value"]:
+        return Response(status_code=401)
+
+    return Response(status_code=200)
 
 @app.post("/accounting")
-async def process_accounting(data: Dict = Body(...)):
-    """
-    Handles RADIUS Accounting-Request (Start/Stop).
-    Normalizes incoming data and manages real-time session state in Redis.
-    """
-    # Normalize keys to lowercase to handle different RADIUS attribute formats
-    clean_data = {str(k).lower(): v for k, v in data.items()}
-    print(f"DEBUG Temizlenmiş Veri: {clean_data}")
+async def accounting(request: Request):
+    # RADIUS Accounting endpoint (currently disabled for simplicity)
+    return Response(status_code=204)
 
-    # Extract required attributes from normalized data
-    username = clean_data.get("user-name") or clean_data.get("username")
-    status_type = str(clean_data.get("acct-status-type") or clean_data.get("status_type") or "").lower()
-    session_id = clean_data.get("acct-session-id") or clean_data.get("session_id")
-
-    # Extract username and handle potential dictionary-like structures from RADIUS
-    raw_username = clean_data.get("user-name") or clean_data.get("username")
-    
-    # If the username comes as a dict/list extract the string
-    if isinstance(raw_username, dict):
-        username = raw_username.get("value", [None])[0]
-    elif isinstance(raw_username, list):
-        username = raw_username[0]
-    else:
-        username = raw_username
-
-    if username:
-        # Normalize username to string and remove any unwanted characters
-        username = str(username).strip()
-        redis_key = f"session:{username}"
-        # If user session starts, store it in Redis
-        if "start" in status_type:
-            redis_client.set(redis_key, str(session_id))
-            print(f"DEBUG: {username} Redis'e YAZILDI.")
-        # If user session stops, remove it from Redis
-        elif "stop" in status_type:
-            redis_client.delete(redis_key)
-            print(f"DEBUG: {username} Redis'ten SİLİNDİ.")
-    
-    return {"status": "success"}
+@app.get("/users")
+async def list_users():
+    # Fetch all users and their groups for the dashboard
+    async with app.state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT r.username, g.groupname
+            FROM radcheck r
+            LEFT JOIN radusergroup g ON r.username = g.username
+            ORDER BY r.username
+            """
+        )
+    return [{"username": r["username"], "group": r["groupname"]} for r in rows]
 
 @app.get("/sessions/active")
-async def get_active_sessions():
-    """
-    Retrieves all active network sessions from Redis.
-    Used for real-time monitoring of connected users.
-    """
-    # Fetch all keys matching the session pattern
-    keys = redis_client.keys("session:*")
-    # Extract only the username part from the Redis keys
-    active_users = [k.replace("session:", "") for k in keys]
-    return {
-        "count": len(active_users),
-        "active_users": active_users
-    }
+async def active_sessions():
+    # Placeholder for active sessions tracking
+    return []

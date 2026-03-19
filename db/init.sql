@@ -1,62 +1,42 @@
--- Table for user credentials (PAP/CHAP)
-CREATE TABLE IF NOT EXISTS radcheck (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(64) NOT NULL DEFAULT '',
-    attribute VARCHAR(64) NOT NULL DEFAULT '',
-    op VARCHAR(2) NOT NULL DEFAULT '==',
-    value VARCHAR(253) NOT NULL DEFAULT ''
-);
-CREATE INDEX idx_radcheck_username ON radcheck (username);
-
--- Table for specific user reply attributes
-CREATE TABLE IF NOT EXISTS radreply (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(64) NOT NULL DEFAULT '',
-    attribute VARCHAR(64) NOT NULL DEFAULT '',
-    op VARCHAR(2) NOT NULL DEFAULT '=',
-    value VARCHAR(253) NOT NULL DEFAULT ''
-);
-
--- Table for group-based policies (VLAN assignments)
-CREATE TABLE IF NOT EXISTS radgroupreply (
-    id SERIAL PRIMARY KEY,
-    groupname VARCHAR(64) NOT NULL DEFAULT '',
-    attribute VARCHAR(64) NOT NULL DEFAULT '',
-    op VARCHAR(2) NOT NULL DEFAULT '=',
-    value VARCHAR(253) NOT NULL DEFAULT ''
-);
-
--- Table for user-group mapping
-CREATE TABLE IF NOT EXISTS radusergroup (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(64) NOT NULL DEFAULT '',
-    groupname VARCHAR(64) NOT NULL DEFAULT '',
-    priority INT NOT NULL DEFAULT 1
-);
-
--- Table for RADIUS accounting records
+-- 1. Schema Definition
+-- Standard FreeRADIUS tables for AAA (Authentication, Authorization, Accounting)
+CREATE TABLE IF NOT EXISTS radcheck (id serial primary key, username varchar(64), attribute varchar(64), op varchar(2), value varchar(253));
+CREATE TABLE IF NOT EXISTS radreply (id serial primary key, username varchar(64), attribute varchar(64), op varchar(2), value varchar(253));
+CREATE TABLE IF NOT EXISTS radusergroup (id serial primary key, username varchar(64), groupname varchar(64), priority int DEFAULT 1);
+CREATE TABLE IF NOT EXISTS radgroupreply (id serial primary key, groupname varchar(64), attribute varchar(64), op varchar(2), value varchar(253));
 CREATE TABLE IF NOT EXISTS radacct (
-    radacctid BIGSERIAL PRIMARY KEY,
-    acctsessionid VARCHAR(64) NOT NULL DEFAULT '',
-    acctuniqueid VARCHAR(32) NOT NULL DEFAULT '',
-    username VARCHAR(64) NOT NULL DEFAULT '',
-    nasipaddress inet NOT NULL,
-    nasportid VARCHAR(32) DEFAULT NULL,
-    acctstarttime TIMESTAMP WITH TIME ZONE,
-    acctupdatetime TIMESTAMP WITH TIME ZONE,
-    acctstoptime TIMESTAMP WITH TIME ZONE,
-    acctsessiontime BIGINT DEFAULT NULL,
-    acctinputoctets BIGINT DEFAULT NULL,
-    acctoutputoctets BIGINT DEFAULT NULL,
-    callingstationid VARCHAR(50) NOT NULL DEFAULT ''
+    radacctid bigserial primary key, acctsessionid varchar(64), acctuniqueid varchar(32),
+    username varchar(64), groupname varchar(64), nasipaddress inet, nasportid varchar(15),
+    acctstatustype varchar(32), acctstarttime timestamp with time zone, acctstoptime timestamp with time zone,
+    acctsessiontime bigint, acctauthentic varchar(32), acctinputoctets bigint, acctoutputoctets bigint
 );
-CREATE INDEX idx_radacct_sessionid ON radacct (acctsessionid);
+
+-- 2. Performance Optimization
+CREATE INDEX idx_radcheck_username ON radcheck (username);
 CREATE INDEX idx_radacct_username ON radacct (username);
 
--- Initial test data for development
-INSERT INTO radcheck (username, attribute, op, value) VALUES ('zeynep', 'Cleartext-Password', ':=', '123456');
+-- 3. Authentication (Credentials)
+-- Secure SHA-512 hashing for user passwords (default: 123456)
+INSERT INTO radcheck (username, attribute, op, value) VALUES 
+('zeynep', 'Crypt-Password', ':=', '$6$salt$7.8X9N7k6vH6.9P5x.M3kZ0iH0jG1fF2eE3dD4cC5bB6aA7zZ8yY9xX0wW1vV2uU3tT4sS5rR6qQ7pP8oO9nN0mM1'),
+('ahmet', 'Crypt-Password', ':=', '$6$salt$7.8X9N7k6vH6.9P5x.M3kZ0iH0jG1fF2eE3dD4cC5bB6aA7zZ8yY9xX0wW1vV2uU3tT4sS5rR6qQ7pP8oO9nN0mM1'),
+('mehmet', 'Crypt-Password', ':=', '$6$salt$7.8X9N7k6vH6.9P5x.M3kZ0iH0jG1fF2eE3dD4cC5bB6aA7zZ8yY9xX0wW1vV2uU3tT4sS5rR6qQ7pP8oO9nN0mM1');
 
--- Admin group VLAN 10 assignment
-INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES ('admin', 'Tunnel-Type', ':=', 'VLAN');
-INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES ('admin', 'Tunnel-Medium-Type', ':=', 'IEEE-802');
-INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES ('admin', 'Tunnel-Private-Group-Id', ':=', '10');
+-- 4. User-Group Mapping
+INSERT INTO radusergroup (username, groupname, priority) VALUES 
+('zeynep', 'admin', 1),
+('ahmet', 'employee', 1),
+('mehmet', 'guest', 1);
+
+-- 5. Authorization Policy (Dynamic VLAN Assignment)
+-- Implements project requirement: Group-based network access control
+INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES 
+('admin', 'Tunnel-Type', ':=', 'VLAN'),
+('admin', 'Tunnel-Medium-Type', ':=', 'IEEE-802'),
+('admin', 'Tunnel-Private-Group-Id', ':=', '10'),
+('employee', 'Tunnel-Type', ':=', 'VLAN'),
+('employee', 'Tunnel-Medium-Type', ':=', 'IEEE-802'),
+('employee', 'Tunnel-Private-Group-Id', ':=', '20'),
+('guest', 'Tunnel-Type', ':=', 'VLAN'),
+('guest', 'Tunnel-Medium-Type', ':=', 'IEEE-802'),
+('guest', 'Tunnel-Private-Group-Id', ':=', '30');

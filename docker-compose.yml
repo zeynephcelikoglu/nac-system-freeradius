@@ -1,9 +1,9 @@
+
+version: '3.8'
 services:
-  # Database for users and accounting data
-  postgres:
-    image: postgres:18-alpine
+  nac_db:
     container_name: nac_postgres
-    env_file: .env
+    image: postgres:15-alpine
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -13,40 +13,60 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - nac_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Redis for session caching and rate-limiting
-  redis:
-    image: redis:8-alpine
+  nac_redis:
     container_name: nac_redis
-    networks:
-      - nac_net
+    image: redis:7-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # FastAPI Policy Engine (Core Logic)
-  api:
-    build: ./api
+  nac_api:
     container_name: nac_api
-    env_file: .env
+    build: ./api
     ports:
       - "8000:8000"
+    env_file: .env
     depends_on:
-      - postgres
-      - redis
+      nac_db:
+        condition: service_healthy
+      nac_redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://nac_admin:nac_pass@nac_db:5432/nac_db
+      - REDIS_HOST=nac_redis  
+      - REDIS_PORT=6379
     networks:
       - nac_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s  
 
-  # FreeRADIUS 3.2 Server
-  freeradius:
+  nac_radius:
+    container_name: nac_radius
     image: freeradius/freeradius-server:latest-3.2
     platform: linux/amd64
-    container_name: nac_radius
-    command: freeradius -X -d /etc/raddb
-    ports:
-      - "1812:1812/udp" # Auth
-      - "1813:1813/udp" # Acct
     volumes:
       - ./radius/config:/etc/raddb
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
     depends_on:
-      - api
+      nac_api:
+        condition: service_started 
     networks:
       - nac_net
 
@@ -56,3 +76,4 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:
