@@ -1,0 +1,10 @@
+# Security
+.env
+
+# Python
+__pycache__/
+*.pyc
+api/venv/
+
+# Docker
+postgres_data/
