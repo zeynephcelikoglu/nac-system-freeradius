@@ -14,7 +14,21 @@ postgres_data/
 .DS_Store
 
 # FreeRADIUS 
-radius/config/certs/*.pem
-radius/config/certs/*.der
-radius/config/certs/*.csr
+radius/config/certs/**
+radius/config/mods-available/**
+radius/config/mods-config/**
+radius/config/sites-available/**
+radius/config/policy.d/**
+radius/config/sites-enabled/**
+radius/config/mods-enabled/**
+radius/config/*.conf
+radius/config/dictionary
+radius/config/panic.gdb
+radius/config/README.rst
+radius/config/certs/bootstrap
+radius/config/panic.gdb
+
+!radius/config/sites-available/default
+!radius/config/mods-enabled/rest
+!radius/config/policy.d/accounting
 !radius/config/certs/bootstrap
