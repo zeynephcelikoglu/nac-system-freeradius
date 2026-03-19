@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, BigInteger, DateTime
-from .database import Base
+from database import Base
 
 # Table for user credentials
 class RadCheck(Base):
