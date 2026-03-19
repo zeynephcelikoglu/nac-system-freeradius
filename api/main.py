@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -23,12 +24,18 @@ def authenticate_user(request: AuthRequest, db: Session = Depends(get_db)):
     
     # 2. Return reject if user does not exist
     if not user:
-        return {"status": "reject", "message": "User not found"}
+        return {"status": "reject", "message": "User not found", "vlan": None}
     
     # Password verification
     # Note: Currently comparing plain text, will migrate to bcrypt hashing
     if request.password != user.value:
-        return {"status": "reject", "message": "Invalid password"}
+        return {"status": "reject", "message": "Invalid password", "vlan": None}
 
-    # 3. Grant access if credentials are valid
-    return {"status": "accept", "message": f"Welcome {request.username}"}
+    # 3. Authorization: Grant access and assign dynamic VLAN policy
+    assigned_vlan = "10"
+    return {
+        "status": "accept", 
+        "message": f"Welcome {request.username}",
+        "vlan": assigned_vlan
+    }
+    
