@@ -5,6 +5,16 @@
 __pycache__/
 *.pyc
 api/venv/
+.venv/
 
 # Docker
 postgres_data/
+
+# MacOS
+.DS_Store
+
+# FreeRADIUS 
+radius/config/certs/*.pem
+radius/config/certs/*.der
+radius/config/certs/*.csr
+!radius/config/certs/bootstrap

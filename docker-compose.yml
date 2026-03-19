@@ -37,7 +37,9 @@ services:
   # FreeRADIUS 3.2 Server
   freeradius:
     image: freeradius/freeradius-server:latest-3.2
+    platform: linux/amd64
     container_name: nac_radius
+    command: freeradius -X -d /etc/raddb
     ports:
       - "1812:1812/udp" # Auth
       - "1813:1813/udp" # Acct

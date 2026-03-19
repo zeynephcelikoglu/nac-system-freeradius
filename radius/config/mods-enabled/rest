@@ -1,0 +1,48 @@
+rest {
+	connect_uri = "http://api:8000"
+
+	authorize {
+        	uri = "${..connect_uri}/auth"
+        	method = "post"
+        	body = "json"
+        	data = '{ "username": "%{User-Name}", "password": "%{User-Password}" }'
+        	tls {
+            		check_cert = no
+            		check_cert_cn = no
+        	}
+    	}	
+
+	authenticate {
+        	uri = "${..connect_uri}/auth"
+        	method = "post"
+        	body = "json"
+        	data = '{ "username": "%{User-Name}", "password": "%{User-Password}" }'
+        	tls {
+            		check_cert = no
+            		check_cert_cn = no
+        	}
+    	}
+	
+	accounting {
+        	uri = "${..connect_uri}/accounting"
+        	method = "post"
+        	body = "json"
+        	tls {
+            		check_cert = no
+            		check_cert_cn = no
+        	}
+    	}
+	
+	pool {
+        	start = 0
+        	min = 0
+        	max = 10
+        	spare = 3
+        	uses = 0
+        	lifetime = 0
+        	cleanup_interval = 30
+        	idle_timeout = 60
+        	retry_delay = 1
+        	max_retries = 5
+   	 }
+}
