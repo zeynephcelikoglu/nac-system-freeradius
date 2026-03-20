@@ -81,6 +81,15 @@ async def auth(request: Request):
     if not username or not password:
         return Response(status_code=401)
 
+    # Rate-limit control
+    redis = getattr(app.state, "redis", None)
+    rate_key = f"auth_fail:{username}"
+    if redis:
+        fail_count = await redis.get(rate_key)
+        if fail_count and int(fail_count) >= 5:
+            print(f"RATE LIMIT: {username} blocked for 5 minutes")
+            return Response(status_code=429) 
+
     # Verify Cleartext-Password from radcheck table
     async with app.state.db.acquire() as conn:
         row = await conn.fetchrow(
@@ -93,18 +102,28 @@ async def auth(request: Request):
             username,
         )
 
-    # Check if user exists and password matches
     if not row or not row["value"]:
         return Response(status_code=401)
 
+    verified = False
     if row["attribute"] == "Bcrypt-Password":
-        stored = row["value"].encode("utf-8")
-        incoming = password.encode("utf-8")
-        if not bcrypt.checkpw(incoming, stored):
-            return Response(status_code=401)
+        verified = bcrypt.checkpw(password.encode("utf-8"), row["value"].encode("utf-8"))
     else:
-        if password != row["value"]:
-            return Response(status_code=401)
+        verified = (password == row["value"])
+
+    # Handle failed authentication and increment rate limit counter
+    if not verified:
+        if redis:
+            await redis.incr(rate_key)
+            await redis.expire(rate_key, 300) # Block for 5 minutes
+            count = await redis.get(rate_key)
+            print(f"AUTH FAIL: {username} ({count}/5)")
+        return Response(status_code=401)
+
+    # Reset rate limit counter on successful login
+    if redis:
+        await redis.delete(rate_key)
+    print(f"AUTH OK: {username}")
 
     return Response(status_code=200)
 
@@ -121,7 +140,6 @@ def extract(field):
     if isinstance(field, list):
         return str(field[0]) if field else ""
     return str(field) if field is not None else ""
-
 
 @app.post("/accounting")
 async def accounting(request: Request):
@@ -258,12 +276,23 @@ async def list_users():
 
 @app.get("/sessions/active")
 async def active_sessions():
-    if not hasattr(app.state, "redis"):
+    # Check if Redis connection exists
+    redis = getattr(app.state, "redis", None)
+    if not redis:
         return []
     
+    # Retrieve all active session IDs from Redis set
     session_ids = await app.state.redis.smembers("active_sessions")
     results = []
     for s_id in session_ids:
-        data = await app.state.redis.hgetall(f"session:{s_id.decode()}")
-        results.append({"session_id": s_id.decode(), "user": data.get(b"username", b"").decode()})
+        # Fetch detailed session data from Redis hash
+        data = await redis.hgetall(f"session:{s_id}")
+        results.append({
+            "session_id": s_id,
+            "username":   data.get("username", ""),
+            "nas_ip":     data.get("nas_ip", ""),
+            "status":     data.get("status", ""),
+        })
+        
+    # Return the list of active sessions as JSON
     return results
