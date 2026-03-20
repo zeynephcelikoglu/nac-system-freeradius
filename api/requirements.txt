@@ -4,3 +4,6 @@ redis[asyncio]
 bcrypt
 asyncpg
 python-multipart
+pytest
+pytest-asyncio
+httpx
