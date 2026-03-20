@@ -1,6 +1,7 @@
 import os
 import asyncpg
 import bcrypt
+import re
 from redis import asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager
@@ -45,7 +46,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def index():
     return FileResponse("static/index.html")
 
-@app.get("/")
+@app.get("/health")
 async def health():
     # Simple health check endpoint
     return {"status": "ok"}
@@ -80,16 +81,43 @@ async def authorize(request: Request):
         "Tunnel-Private-Group-Id": vlan_id,
     }
 
+def is_mac_address(value: str) -> bool:
+    # Validate MAC address format (00:11:22:33:44:55 or 001122334455)
+    clean = str(value).upper().replace(":", "").replace("-", "")
+    return bool(re.fullmatch(r"[0-9A-F]{12}", clean))
+
+def normalize_mac(value: str) -> str:
+    # Normalize MAC address to 00:11:22:33:44:55 format
+    clean = str(value).upper().replace(":", "").replace("-", "")
+    return ":".join(clean[i:i+2] for i in range(0, 12, 2))
+
 @app.post("/auth")
 async def auth(request: Request):
     body = await request.json()
     username = body.get("username") or body.get("User-Name")
     password = body.get("password") or body.get("User-Password")
 
+    print(f"AUTH INCOMING: user={username!r} pass={password!r} is_mac={is_mac_address(str(password)) if password else False}")
+
     if not username or not password:
         return Response(status_code=401)
 
-    # Rate-limit control
+    # Handle MAC Authentication Bypass (MAB) for IoT devices
+    if not password or is_mac_address(str(password)):
+        mac = normalize_mac(str(username))
+        print(f"MAB REQUEST: {mac}")
+        async with app.state.db.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id FROM mac_whitelist WHERE mac_address = $1",
+                mac,
+            )
+        if row:
+            print(f"MAB ACCEPT: {mac}")
+            return Response(status_code=200)
+        print(f"MAB REJECT: {mac} not in whitelist")
+        return Response(status_code=401)
+
+    # Apply rate-limiting to prevent brute-force attacks
     redis = getattr(app.state, "redis", None)
     rate_key = f"auth_fail:{username}"
     if redis:
