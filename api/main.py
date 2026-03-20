@@ -1,15 +1,38 @@
+import os
+import asyncpg
+from redis import asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager
-import asyncpg
-import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database connection pool on startup
+    # Initialize PostgreSQL connection pool
     app.state.db = await asyncpg.create_pool(os.environ["DATABASE_URL"])
+    
+    # Initialize Redis connection
+    try:
+        # Use Docker service name for container networking
+        redis_host = os.environ.get("REDIS_HOST", "nac_redis")
+        redis_port = os.environ.get("REDIS_PORT", "6379")
+        
+        app.state.redis = aioredis.from_url(
+            f"redis://{redis_host}:{redis_port}",
+            encoding="utf-8",
+            decode_responses=True
+        )
+        # Verify connection
+        await app.state.redis.ping()
+        print(f"REDIS CONNECTED: {redis_host}:{redis_port}")
+    except Exception as e:
+        print(f"REDIS ERROR: {e}")
+        app.state.redis = None
+    
     yield
-    # Close database pool on shutdown
+    
+    # Graceful shutdown: close connections
     await app.state.db.close()
+    if app.state.redis:
+        await app.state.redis.close()
 
 app = FastAPI(lifespan=lifespan)
 
