@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS radacct (
     radacctid bigserial primary key, acctsessionid varchar(64), acctuniqueid varchar(32),
     username varchar(64), groupname varchar(64), nasipaddress inet, nasportid varchar(15),
     acctstatustype varchar(32), acctstarttime timestamp with time zone, acctstoptime timestamp with time zone,
-    acctsessiontime bigint, acctauthentic varchar(32), acctinputoctets bigint, acctoutputoctets bigint
+    acctsessiontime bigint, acctauthentic varchar(32), acctinputoctets bigint, acctoutputoctets bigint,
+    callingstationid varchar(64) DEFAULT ''
 );
 
 -- 2. Performance Optimization
@@ -18,9 +19,9 @@ CREATE INDEX idx_radacct_username ON radacct (username);
 -- 3. Authentication (Credentials)
 -- Secure SHA-512 hashing for user passwords (default: 123456)
 INSERT INTO radcheck (username, attribute, op, value) VALUES 
-('zeynep', 'Crypt-Password', ':=', '$6$salt$7.8X9N7k6vH6.9P5x.M3kZ0iH0jG1fF2eE3dD4cC5bB6aA7zZ8yY9xX0wW1vV2uU3tT4sS5rR6qQ7pP8oO9nN0mM1'),
-('ahmet', 'Crypt-Password', ':=', '$6$salt$7.8X9N7k6vH6.9P5x.M3kZ0iH0jG1fF2eE3dD4cC5bB6aA7zZ8yY9xX0wW1vV2uU3tT4sS5rR6qQ7pP8oO9nN0mM1'),
-('mehmet', 'Crypt-Password', ':=', '$6$salt$7.8X9N7k6vH6.9P5x.M3kZ0iH0jG1fF2eE3dD4cC5bB6aA7zZ8yY9xX0wW1vV2uU3tT4sS5rR6qQ7pP8oO9nN0mM1');
+('zeynep', 'Bcrypt-Password', ':=', '$2b$12$h7xCVSu5gg/0AG8GOvoKGu4cKX4KvvSYmSjyH/.db6VKhzjEtFAQi'),
+('ahmet', 'Bcrypt-Password', ':=', '$2b$12$h7xCVSu5gg/0AG8GOvoKGu4cKX4KvvSYmSjyH/.db6VKhzjEtFAQi'),
+('mehmet', 'Bcrypt-Password', ':=', '$2b$12$h7xCVSu5gg/0AG8GOvoKGu4cKX4KvvSYmSjyH/.db6VKhzjEtFAQi');
 
 -- 4. User-Group Mapping
 INSERT INTO radusergroup (username, groupname, priority) VALUES 

@@ -1,5 +1,6 @@
 import os
 import asyncpg
+import bcrypt
 from redis import asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager
@@ -73,13 +74,7 @@ async def authorize(request: Request):
 
 @app.post("/auth")
 async def auth(request: Request):
-    """
-    Step 2: Authentication
-    Validates the user password against the database
-    """
     body = await request.json()
-    print("AUTH BODY:", body) # Log incoming request for debugging
-
     username = body.get("username") or body.get("User-Name")
     password = body.get("password") or body.get("User-Password")
 
@@ -90,16 +85,26 @@ async def auth(request: Request):
     async with app.state.db.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT value FROM radcheck
-            WHERE username = $1 AND attribute = 'Cleartext-Password'
+            SELECT attribute, value FROM radcheck
+            WHERE username = $1 
+            AND attribute IN ('Bcrypt-Password', 'Cleartext-Password')
             LIMIT 1
             """,
             username,
         )
 
     # Check if user exists and password matches
-    if not row or password != row["value"]:
+    if not row or not row["value"]:
         return Response(status_code=401)
+
+    if row["attribute"] == "Bcrypt-Password":
+        stored = row["value"].encode("utf-8")
+        incoming = password.encode("utf-8")
+        if not bcrypt.checkpw(incoming, stored):
+            return Response(status_code=401)
+    else:
+        if password != row["value"]:
+            return Response(status_code=401)
 
     return Response(status_code=200)
 
