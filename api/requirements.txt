@@ -3,3 +3,4 @@ uvicorn[standard]
 redis[asyncio]
 bcrypt
 asyncpg
+python-multipart

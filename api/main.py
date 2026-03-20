@@ -4,6 +4,8 @@ import bcrypt
 from redis import asyncio as aioredis
 from fastapi import FastAPI, Request, Response
 from contextlib import asynccontextmanager
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +38,12 @@ async def lifespan(app: FastAPI):
         await app.state.redis.close()
 
 app = FastAPI(lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def index():
+    return FileResponse("static/index.html")
 
 @app.get("/")
 async def health():
@@ -293,6 +301,6 @@ async def active_sessions():
             "nas_ip":     data.get("nas_ip", ""),
             "status":     data.get("status", ""),
         })
-        
+
     # Return the list of active sessions as JSON
     return results

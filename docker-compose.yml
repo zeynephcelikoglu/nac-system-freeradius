@@ -49,11 +49,10 @@ services:
     networks:
       - nac_net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s  
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   nac_radius:
     container_name: nac_radius
