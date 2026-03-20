@@ -41,3 +41,20 @@ INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES
 ('guest', 'Tunnel-Type', ':=', 'VLAN'),
 ('guest', 'Tunnel-Medium-Type', ':=', 'IEEE-802'),
 ('guest', 'Tunnel-Private-Group-Id', ':=', '30');
+
+-- MAB (MAC Authentication Bypass) whitelist table
+CREATE TABLE IF NOT EXISTS mac_whitelist (
+    id          SERIAL PRIMARY KEY,
+    mac_address VARCHAR(17) NOT NULL UNIQUE,
+    description VARCHAR(128) DEFAULT ''
+);
+
+-- Seed data for IoT testing
+INSERT INTO mac_whitelist (mac_address, description)
+VALUES ('00:11:22:33:44:55', 'Test IoT Device')
+ON CONFLICT DO NOTHING;
+
+-- Map IoT device to Guest VLAN (VLAN 30)
+INSERT INTO radusergroup (username, groupname, priority)
+VALUES ('00:11:22:33:44:55', 'guest', 1)
+ON CONFLICT DO NOTHING;
