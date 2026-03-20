@@ -1,7 +1,7 @@
 services:
   nac_db:
     container_name: nac_postgres
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -19,7 +19,7 @@ services:
 
   nac_redis:
     container_name: nac_redis
-    image: redis:7-alpine
+    image: redis:8-alpine
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -49,10 +49,11 @@ services:
     networks:
       - nac_net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   nac_radius:
     container_name: nac_radius
