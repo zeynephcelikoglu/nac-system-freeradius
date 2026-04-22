@@ -3,10 +3,51 @@ import asyncpg
 import bcrypt
 import re
 from redis import asyncio as aioredis
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException, Query
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+
+
+class WhitelistRequest(BaseModel):
+    mac_address: str = Field(..., description="MAC address in any common format")
+    description: str = Field(default="", max_length=128)
+
+
+class TelemetryRequest(BaseModel):
+    device_mac: str = Field(..., description="Device MAC address")
+    payload: str = Field(..., description="CoAP payload body")
+    message_type: str = Field(default="coap", max_length=32)
+    path: str = Field(default="/telemetry", max_length=128)
+    source_ip: str = Field(default="", max_length=64)
+
+
+async def write_access_log(
+    username: str,
+    mac_address: str,
+    status: str,
+    reason: str,
+    source: str,
+    session_id: str = "",
+):
+    try:
+        async with app.state.db.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO access_logs
+                    (username, mac_address, status, reason, source, session_id)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                """,
+                username,
+                mac_address,
+                status,
+                reason,
+                source,
+                session_id,
+            )
+    except Exception as exc:
+        print(f"ACCESS LOG ERROR: {exc}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -96,25 +137,35 @@ async def auth(request: Request):
     body = await request.json()
     username = body.get("username") or body.get("User-Name")
     password = body.get("password") or body.get("User-Password")
+    session_id = body.get("Acct-Session-Id", "")
+    auth_source = "mab" if is_mac_address(str(username)) or is_mac_address(str(password)) else "pap"
 
-    print(f"AUTH INCOMING: user={username!r} pass={password!r} is_mac={is_mac_address(str(password)) if password else False}")
+    print(
+        f"AUTH INCOMING: user={username!r} source={auth_source} "
+        f"is_user_mac={is_mac_address(str(username)) if username else False} "
+        f"is_pass_mac={is_mac_address(str(password)) if password else False}"
+    )
 
     if not username or not password:
+        await write_access_log(str(username or ""), "", "REJECT", "missing_credentials", auth_source, str(session_id or ""))
         return Response(status_code=401)
 
     # Handle MAC Authentication Bypass (MAB) for IoT devices
-    if not password or is_mac_address(str(password)):
-        mac = normalize_mac(str(username))
+    if is_mac_address(str(username)) or is_mac_address(str(password)):
+        candidate_mac = str(username) if is_mac_address(str(username)) else str(password)
+        mac = normalize_mac(candidate_mac)
         print(f"MAB REQUEST: {mac}")
         async with app.state.db.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT id FROM mac_whitelist WHERE mac_address = $1",
+                "SELECT id FROM mac_whitelist WHERE mac_address = $1 AND enabled = TRUE",
                 mac,
             )
         if row:
             print(f"MAB ACCEPT: {mac}")
+            await write_access_log(str(username), mac, "ACCEPT", "mac_whitelisted", "mab", str(session_id or ""))
             return Response(status_code=200)
         print(f"MAB REJECT: {mac} not in whitelist")
+        await write_access_log(str(username), mac, "REJECT", "mac_not_whitelisted", "mab", str(session_id or ""))
         return Response(status_code=401)
 
     # Apply rate-limiting to prevent brute-force attacks
@@ -139,6 +190,7 @@ async def auth(request: Request):
         )
 
     if not row or not row["value"]:
+        await write_access_log(str(username), "", "REJECT", "user_not_found", "pap", str(session_id or ""))
         return Response(status_code=401)
 
     verified = False
@@ -154,12 +206,14 @@ async def auth(request: Request):
             await redis.expire(rate_key, 300) # Block for 5 minutes
             count = await redis.get(rate_key)
             print(f"AUTH FAIL: {username} ({count}/5)")
+        await write_access_log(str(username), "", "REJECT", "invalid_password", "pap", str(session_id or ""))
         return Response(status_code=401)
 
     # Reset rate limit counter on successful login
     if redis:
         await redis.delete(rate_key)
     print(f"AUTH OK: {username}")
+    await write_access_log(str(username), "", "ACCEPT", "password_verified", "pap", str(session_id or ""))
 
     return Response(status_code=200)
 
@@ -309,6 +363,154 @@ async def list_users():
             """
         )
     return [{"username": r["username"], "group": r["groupname"]} for r in rows]
+
+
+@app.get("/whitelist")
+async def list_whitelist():
+    async with app.state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT mac_address, description, enabled, created_at
+            FROM mac_whitelist
+            ORDER BY created_at DESC
+            """
+        )
+    return [
+        {
+            "mac_address": row["mac_address"],
+            "description": row["description"],
+            "enabled": row["enabled"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        }
+        for row in rows
+    ]
+
+
+@app.post("/whitelist", status_code=201)
+async def add_whitelist_device(item: WhitelistRequest):
+    if not is_mac_address(item.mac_address):
+        raise HTTPException(status_code=400, detail="Invalid MAC address format")
+
+    mac = normalize_mac(item.mac_address)
+    async with app.state.db.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO mac_whitelist (mac_address, description, enabled)
+            VALUES ($1, $2, TRUE)
+            ON CONFLICT (mac_address)
+            DO UPDATE SET
+                description = EXCLUDED.description,
+                enabled = TRUE
+            """,
+            mac,
+            item.description,
+        )
+    return {"message": "device_whitelisted", "mac_address": mac}
+
+
+@app.delete("/whitelist/{mac_address}")
+async def disable_whitelist_device(mac_address: str):
+    if not is_mac_address(mac_address):
+        raise HTTPException(status_code=400, detail="Invalid MAC address format")
+
+    mac = normalize_mac(mac_address)
+    async with app.state.db.acquire() as conn:
+        result = await conn.execute(
+            """
+            UPDATE mac_whitelist
+            SET enabled = FALSE
+            WHERE mac_address = $1
+            """,
+            mac,
+        )
+
+    if result.endswith("0"):
+        raise HTTPException(status_code=404, detail="MAC not found")
+    return {"message": "device_disabled", "mac_address": mac}
+
+
+@app.get("/logs/access")
+async def access_logs(limit: int = Query(default=50, ge=1, le=500)):
+    async with app.state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT created_at, username, mac_address, status, reason, source, session_id
+            FROM access_logs
+            ORDER BY created_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+
+    return [
+        {
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "username": row["username"],
+            "mac_address": row["mac_address"],
+            "status": row["status"],
+            "reason": row["reason"],
+            "source": row["source"],
+            "session_id": row["session_id"],
+        }
+        for row in rows
+    ]
+
+
+@app.post("/iot/telemetry", status_code=202)
+async def ingest_iot_telemetry(data: TelemetryRequest):
+    if not is_mac_address(data.device_mac):
+        raise HTTPException(status_code=400, detail="Invalid MAC address format")
+
+    mac = normalize_mac(data.device_mac)
+    async with app.state.db.acquire() as conn:
+        device = await conn.fetchrow(
+            "SELECT id FROM mac_whitelist WHERE mac_address = $1 AND enabled = TRUE",
+            mac,
+        )
+
+        if not device:
+            await write_access_log(mac, mac, "REJECT", "telemetry_from_untrusted_device", "coap")
+            raise HTTPException(status_code=403, detail="Device not whitelisted")
+
+        await conn.execute(
+            """
+            INSERT INTO iot_telemetry (device_mac, payload, message_type, path, source_ip)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            mac,
+            data.payload,
+            data.message_type,
+            data.path,
+            data.source_ip,
+        )
+
+    return {"message": "telemetry_accepted", "device_mac": mac}
+
+
+@app.get("/iot/telemetry")
+async def get_iot_telemetry(limit: int = Query(default=50, ge=1, le=500)):
+    async with app.state.db.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT created_at, device_mac, payload, message_type, path, source_ip
+            FROM iot_telemetry
+            ORDER BY created_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+
+    return [
+        {
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "device_mac": row["device_mac"],
+            "payload": row["payload"],
+            "message_type": row["message_type"],
+            "path": row["path"],
+            "source_ip": row["source_ip"],
+        }
+        for row in rows
+    ]
 
 @app.get("/sessions/active")
 async def active_sessions():

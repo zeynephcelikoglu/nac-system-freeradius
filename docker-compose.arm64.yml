@@ -1,0 +1,15 @@
+services:
+  nac_db:
+    platform: linux/arm64
+
+  nac_redis:
+    platform: linux/arm64
+
+  nac_api:
+    platform: linux/arm64
+
+  nac_coap_bridge:
+    platform: linux/arm64
+
+  nac_radius:
+    platform: linux/amd64

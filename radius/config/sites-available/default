@@ -35,11 +35,11 @@ authorize {
     
     # API Sorgusu için REST modülü
     rest
-    
-    # Eğer API 'ok' dönerse girişe izin ver (Auth-Type := Accept)
-    if (ok) {
+
+    # Kimlik doğrulamayı REST /auth üzerinden yap
+    if (!EAP-Message) {
         update control {
-            &Auth-Type := Accept
+            &Auth-Type := REST
         }
     }
     
@@ -47,6 +47,9 @@ authorize {
 }
 
 authenticate {
+    Auth-Type REST {
+        rest
+    }
     Auth-Type PAP {
         pap
     }
@@ -70,7 +73,7 @@ preacct {
 
 accounting {
     detail
-    sql
+    -sql
     exec
     attr_filter.accounting_response
     
@@ -94,7 +97,7 @@ post-auth {
         &reply: += &session-state:
     }
 
-    sql
+    -sql
     exec
     remove_reply_message_if_eap
 

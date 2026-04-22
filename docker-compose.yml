@@ -8,7 +8,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     networks:
       - nac_net
     healthcheck:
@@ -58,9 +58,10 @@ services:
   nac_radius:
     container_name: nac_radius
     image: freeradius/freeradius-server:latest-3.2
-    platform: linux/amd64
     volumes:
-      - ./radius/config:/etc/raddb
+      - ./radius/config/mods-enabled/rest:/etc/freeradius/mods-enabled/rest
+      - ./radius/config/sites-available/default:/etc/freeradius/sites-available/default
+      - ./radius/config/policy.d/accounting:/etc/freeradius/policy.d/accounting
     ports:
       - "1812:1812/udp"
       - "1813:1813/udp"
@@ -70,11 +71,26 @@ services:
     networks:
       - nac_net
     healthcheck:
-      test: ["CMD-SHELL", "radclient -x localhost:1812 status testing123 2>&1 | grep -q 'Access-Accept\\|Received' || exit 1"]
+      test: ["CMD-SHELL", "freeradius -XC >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  nac_coap_bridge:
+    container_name: nac_coap_bridge
+    build: ./coap-bridge
+    environment:
+      - FASTAPI_BASE_URL=http://nac_api:8000
+      - COAP_BIND_HOST=0.0.0.0
+      - COAP_BIND_PORT=5683
+    ports:
+      - "5683:5683/udp"
+    depends_on:
+      nac_api:
+        condition: service_healthy
+    networks:
+      - nac_net
 
 networks:
   nac_net:

@@ -46,8 +46,37 @@ INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES
 CREATE TABLE IF NOT EXISTS mac_whitelist (
     id          SERIAL PRIMARY KEY,
     mac_address VARCHAR(17) NOT NULL UNIQUE,
-    description VARCHAR(128) DEFAULT ''
+    description VARCHAR(128) DEFAULT '',
+    enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS access_logs (
+    id          BIGSERIAL PRIMARY KEY,
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    username    VARCHAR(64) NOT NULL DEFAULT '',
+    mac_address VARCHAR(17) NOT NULL DEFAULT '',
+    status      VARCHAR(16) NOT NULL,
+    reason      VARCHAR(64) NOT NULL,
+    source      VARCHAR(16) NOT NULL DEFAULT 'mab',
+    session_id  VARCHAR(64) NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_access_logs_mac ON access_logs (mac_address);
+
+CREATE TABLE IF NOT EXISTS iot_telemetry (
+    id           BIGSERIAL PRIMARY KEY,
+    created_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    device_mac   VARCHAR(17) NOT NULL,
+    payload      TEXT NOT NULL,
+    message_type VARCHAR(32) NOT NULL DEFAULT 'coap',
+    path         VARCHAR(128) NOT NULL DEFAULT '/telemetry',
+    source_ip    VARCHAR(64) NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_iot_telemetry_created_at ON iot_telemetry (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_iot_telemetry_mac ON iot_telemetry (device_mac);
 
 -- Seed data for IoT testing
 INSERT INTO mac_whitelist (mac_address, description)

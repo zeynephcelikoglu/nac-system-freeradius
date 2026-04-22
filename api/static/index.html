@@ -1,413 +1,605 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NAC Monitoring Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT NAC Control Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg-base:    #080c12;
-      --bg-surface: #0f1623;
-      --bg-raised:  #1a2235;
-      --bg-hover:   #1e2a40;
-      --border:     #253045;
-      --text-primary:   #e2e8f0;
-      --text-secondary: #94a3b8;
-      --text-muted:     #4a5568;
-      --accent-blue:  #3b82f6;
-      --accent-green: #22c55e;
-      --accent-amber: #f59e0b;
-      --accent-purple:#a78bfa;
+      --bg: #070b14;
+      --surface: #101726;
+      --surface-2: #151e31;
+      --border: #27324a;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --violet: #a78bfa;
     }
 
     * { box-sizing: border-box; }
 
     body {
-      background-color: var(--bg-base);
-      color: var(--text-primary);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.925rem;
+      margin: 0;
       min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top right, #121c30 0%, var(--bg) 50%);
     }
 
-    /* ── Navbar ── */
-    .navbar {
-      background-color: var(--bg-surface);
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(16, 23, 38, 0.92);
       border-bottom: 1px solid var(--border);
-      padding: 0.9rem 2rem;
-    }
-    .navbar-brand {
-      font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-      color: var(--text-primary) !important;
-    }
-    .dot-live {
-      display: inline-block;
-      width: 8px; height: 8px;
-      background: var(--accent-green);
-      border-radius: 50%;
-      margin-right: 6px;
-      animation: livePulse 2s ease-in-out infinite;
-    }
-    @keyframes livePulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
-      50%      { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+      backdrop-filter: blur(8px);
     }
 
-    /* ── Stat cards ── */
-    .stat-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.4rem 1.6rem;
+    .topbar-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 14px 20px;
       display: flex;
       align-items: center;
-      gap: 1.1rem;
-      transition: border-color .2s;
-    }
-    .stat-card:hover { border-color: #3b4f6e; }
-    .stat-icon {
-      width: 46px; height: 46px;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.3rem;
-      flex-shrink: 0;
-    }
-    .si-blue   { background: rgba(59,130,246,.15); }
-    .si-green  { background: rgba(34,197, 94,.15); }
-    .si-amber  { background: rgba(245,158, 11,.15); }
-    .si-purple { background: rgba(167,139,250,.15); }
-    .stat-number {
-      font-size: 1.85rem;
-      font-weight: 700;
-      line-height: 1;
-      margin-bottom: 2px;
-    }
-    .stat-label {
-      font-size: 0.72rem;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.9px;
-      font-weight: 500;
+      justify-content: space-between;
+      gap: 12px;
     }
 
-    /* ── Cards ── */
-    .dash-card {
-      background: var(--bg-surface);
+    .title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
+    .live-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, .5);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      70% { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn:hover { border-color: #3b4f76; }
+    .btn-primary { background: #173056; border-color: #29508d; }
+    .btn-danger { background: #41161d; border-color: #7f1d1d; }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 18px 20px 26px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 14px;
+    }
+
+    .stack { display: grid; gap: 14px; }
+
+    .card {
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
     }
-    .dash-card-header {
-      background: var(--bg-raised);
+
+    .card-head {
+      padding: 12px 14px;
       border-bottom: 1px solid var(--border);
-      padding: 0.85rem 1.4rem;
-      font-size: 0.82rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-secondary);
+      background: #141d2f;
       display: flex;
       align-items: center;
       justify-content: space-between;
-    }
-
-    /* ── Tables ── */
-    .table {
-      color: var(--text-primary);
-      margin: 0;
-    }
-    .table thead th {
-      background: var(--bg-raised);
-      color: var(--text-muted);
-      font-size: 0.7rem;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      font-weight: 600;
-      border-color: var(--border);
-      padding: 0.65rem 1.1rem;
-    }
-    .table tbody td {
-      border-color: rgba(37,48,69,.6);
-      padding: 0.75rem 1.1rem;
-      vertical-align: middle;
-    }
-    .table tbody tr { transition: background .15s; }
-    .table tbody tr:hover td { background: var(--bg-hover); }
-    .table tbody tr:last-child td { border-bottom: none; }
-
-    /* ── Username ── */
-    .username {
-      font-weight: 600;
-      color: var(--text-primary);
-      font-size: 0.88rem;
+      letter-spacing: .6px;
+      color: var(--muted);
     }
 
-    /* ── Monospace session id ── */
-    .session-id {
-      font-family: 'Courier New', monospace;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      background: var(--bg-raised);
-      padding: 2px 7px;
-      border-radius: 4px;
+    .card-body { padding: 12px 14px; }
+
+    .table-wrap {
+      max-height: 280px;
+      overflow: auto;
     }
 
-    /* ── NAS IP ── */
-    .nas-ip {
-      font-family: 'Courier New', monospace;
-      font-size: 0.8rem;
-      color: #60a5fa;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
     }
 
-    /* ── Group badges (outline pastel) ── */
-    .grp-badge {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 0.72rem; font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 20px;
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .grp-admin    { color: #93c5fd; background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); }
-    .grp-employee { color: #86efac; background: rgba(34,197, 94,.12); border: 1px solid rgba(34,197, 94,.3); }
-    .grp-guest    { color: #cbd5e1; background: rgba(148,163,184,.10); border: 1px solid rgba(148,163,184,.25); }
-
-    /* ── VLAN badge ── */
-    .vlan-badge {
-      font-size: 0.72rem; font-weight: 600;
-      color: #a78bfa;
-      background: rgba(167,139,250,.1);
-      border: 1px solid rgba(167,139,250,.25);
-      padding: 2px 9px;
-      border-radius: 20px;
+      letter-spacing: .7px;
+      border-bottom: 1px solid var(--border);
+      padding: 10px;
+      position: sticky;
+      top: 0;
+      background: #141d2f;
+      z-index: 1;
     }
 
-    /* ── Status badge ── */
-    .status-active {
-      font-size: 0.72rem; font-weight: 600;
-      color: #86efac;
-      background: rgba(34,197,94,.1);
-      border: 1px solid rgba(34,197,94,.25);
-      padding: 3px 10px;
-      border-radius: 20px;
-      display: inline-flex; align-items: center; gap: 5px;
-    }
-    .status-dot {
-      width: 6px; height: 6px;
-      background: #22c55e;
-      border-radius: 50%;
-      animation: softPulse 2.5s ease-in-out infinite;
-    }
-    @keyframes softPulse {
-      0%,100% { opacity: 1; }
-      50%      { opacity: .4; }
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #1b263b;
+      vertical-align: top;
     }
 
-    /* ── Count badge ── */
-    .count-badge {
-      font-size: 0.72rem; font-weight: 700;
-      padding: 3px 9px;
-      border-radius: 20px;
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      color: #bfdbfe;
     }
-    .count-green  { background: rgba(34,197, 94,.15); color: #86efac; border: 1px solid rgba(34,197,94,.25); }
-    .count-blue   { background: rgba(59,130,246,.15); color: #93c5fd; border: 1px solid rgba(59,130,246,.25); }
 
-    /* ── Toolbar ── */
-    .refresh-btn {
-      background: rgba(34,197,94,.15);
-      border: 1px solid rgba(34,197,94,.3);
-      color: #86efac;
-      font-size: 0.78rem;
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .b-ok { background: rgba(34, 197, 94, .15); color: #86efac; border: 1px solid rgba(34, 197, 94, .25); }
+    .b-off { background: rgba(239, 68, 68, .15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, .25); }
+    .b-accept { background: rgba(34, 197, 94, .15); color: #86efac; border: 1px solid rgba(34, 197, 94, .25); }
+    .b-reject { background: rgba(245, 158, 11, .15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, .25); }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .field { display: grid; gap: 6px; }
+
+    label {
+      font-size: 12px;
+      color: var(--muted);
       font-weight: 600;
-      padding: 5px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background .2s;
     }
-    .refresh-btn:hover { background: rgba(34,197,94,.25); }
-    .last-updated { font-size: 0.72rem; color: var(--text-muted); }
 
-    /* ── Empty / error state ── */
-    .empty-state { color: var(--text-muted); font-size: 0.85rem; padding: 2rem 0; }
-    .error-state { color: #f87171; font-size: 0.85rem; padding: 2rem 0; }
+    input, textarea {
+      width: 100%;
+      background: #0d1524;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .status-line {
+      color: #cbd5e1;
+      font-size: 12px;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 18px;
+    }
+
+    @media (max-width: 1200px) {
+      .stats { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .stats { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .form-grid { grid-template-columns: 1fr; }
+      .topbar-inner { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
-
-<!-- Navbar -->
-<nav class="navbar mb-4">
-  <div class="d-flex align-items-center gap-2">
-    <span class="dot-live"></span>
-    <span class="navbar-brand">NAC Monitoring Dashboard</span>
-  </div>
-  <div class="d-flex align-items-center gap-3">
-    <span class="last-updated" id="lastUpdated">—</span>
-    <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
-  </div>
-</nav>
-
-<div class="container-fluid px-4">
-
-  <!-- Stat Row -->
-  <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-3">
-      <div class="stat-card">
-        <div class="stat-icon si-blue">🟦</div>
-        <div>
-          <div class="stat-number text-info" id="statSessions">—</div>
-          <div class="stat-label">Active Sessions</div>
-        </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="title-wrap">
+        <span class="live-dot"></span>
+        <span>IoT NAC Control Center</span>
+      </div>
+      <div class="toolbar">
+        <span id="lastUpdated">Son güncelleme: -</span>
+        <button class="btn" id="refreshBtn" type="button">Yenile</button>
       </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
-      <div class="stat-card">
-        <div class="stat-icon si-green">👤</div>
-        <div>
-          <div class="stat-number" style="color:var(--accent-green)" id="statUsers">—</div>
-          <div class="stat-label">Registered Users</div>
-        </div>
+  </header>
+
+  <main>
+    <section class="stats">
+      <article class="stat"><div class="stat-label">Whitelist</div><div class="stat-value" id="statWhitelist">0</div></article>
+      <article class="stat"><div class="stat-label">Aktif Oturum</div><div class="stat-value" id="statSessions">0</div></article>
+      <article class="stat"><div class="stat-label">Telemetri</div><div class="stat-value" id="statTelemetry">0</div></article>
+      <article class="stat"><div class="stat-label">Accept</div><div class="stat-value" id="statAccept">0</div></article>
+      <article class="stat"><div class="stat-label">Reject</div><div class="stat-value" id="statReject">0</div></article>
+    </section>
+
+    <section class="layout">
+      <div class="stack">
+        <article class="card">
+          <div class="card-head"><span>Whitelist Cihazları</span><span id="whitelistCount">0 kayıt</span></div>
+          <div class="card-body table-wrap">
+            <table>
+              <thead><tr><th>MAC</th><th>Açıklama</th><th>Durum</th><th>İşlem</th></tr></thead>
+              <tbody id="whitelistTable"><tr><td colspan="4" class="empty">Yükleniyor...</td></tr></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><span>Canlı RADIUS Oturumları</span><span id="sessionCount">0 kayıt</span></div>
+          <div class="card-body table-wrap">
+            <table>
+              <thead><tr><th>Cihaz/Kullanıcı</th><th>NAS IP</th><th>Session</th><th>Durum</th></tr></thead>
+              <tbody id="sessionTable"><tr><td colspan="4" class="empty">Yükleniyor...</td></tr></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><span>IoT Telemetri (CoAP Forward)</span><span id="telemetryCount">0 kayıt</span></div>
+          <div class="card-body table-wrap">
+            <table>
+              <thead><tr><th>MAC</th><th>Payload</th><th>Path</th><th>Zaman</th></tr></thead>
+              <tbody id="telemetryTable"><tr><td colspan="4" class="empty">Yükleniyor...</td></tr></tbody>
+            </table>
+          </div>
+        </article>
       </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-      <div class="stat-card">
-        <div class="stat-icon si-amber">🔀</div>
-        <div>
-          <div class="stat-number" style="color:var(--accent-amber)" id="statVlans">—</div>
-          <div class="stat-label">Active VLANs</div>
-        </div>
+
+      <div class="stack">
+        <article class="card">
+          <div class="card-head"><span>Yeni IoT Cihaz Whitelist</span></div>
+          <div class="card-body">
+            <form id="whitelistForm">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="macAddress">MAC Address</label>
+                  <input id="macAddress" placeholder="AA:BB:CC:DD:EE:FF" required />
+                </div>
+                <div class="field">
+                  <label for="macDescription">Açıklama</label>
+                  <input id="macDescription" placeholder="Cooja Sensor Node" />
+                </div>
+              </div>
+              <div style="margin-top:10px;display:flex;gap:8px;">
+                <button class="btn btn-primary" type="submit">Whiteliste Ekle</button>
+              </div>
+            </form>
+            <div class="hint">MAC formatı `00:11:22:33:44:55` veya `001122334455` olabilir.</div>
+            <div class="status-line" id="whitelistFormStatus"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><span>Telemetri Test Gönderimi</span></div>
+          <div class="card-body">
+            <form id="telemetryForm">
+              <div class="field">
+                <label for="telemetryMac">Cihaz MAC</label>
+                <input id="telemetryMac" value="00:11:22:33:44:55" required />
+              </div>
+              <div class="field" style="margin-top:8px;">
+                <label for="telemetryPayload">Payload</label>
+                <textarea id="telemetryPayload">{"temp": 24.4, "hum": 42, "battery": 93}</textarea>
+              </div>
+              <div style="margin-top:10px;display:flex;gap:8px;">
+                <button class="btn" type="submit">API'ye Telemetri Gönder</button>
+              </div>
+            </form>
+            <div class="status-line" id="telemetryFormStatus"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><span>Erişim Kararları (MAB/PAP)</span></div>
+          <div class="card-body table-wrap">
+            <table>
+              <thead><tr><th>Durum</th><th>Kaynak</th><th>MAC</th><th>Neden</th><th>Zaman</th></tr></thead>
+              <tbody id="accessLogTable"><tr><td colspan="5" class="empty">Yükleniyor...</td></tr></tbody>
+            </table>
+          </div>
+        </article>
       </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-      <div class="stat-card">
-        <div class="stat-icon si-purple">🏷️</div>
-        <div>
-          <div class="stat-number" style="color:var(--accent-purple)" id="statGroups">—</div>
-          <div class="stat-label">User Groups</div>
-        </div>
-      </div>
-    </div>
-  </div>
+    </section>
+  </main>
 
-  <!-- Tables Row -->
-  <div class="row g-4">
+  <script>
+    const state = {
+      whitelist: [],
+      sessions: [],
+      telemetry: [],
+      accessLogs: []
+    };
 
-    <!-- Active Sessions -->
-    <div class="col-lg-6">
-      <div class="dash-card h-100">
-        <div class="dash-card-header">
-          <span>Active Sessions</span>
-          <span class="count-badge count-green" id="sessionCount">0</span>
-        </div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>NAS IP</th>
-              <th>Session ID</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="sessionTable">
-            <tr><td colspan="4" class="text-center empty-state">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    const escapeHtml = (value) => String(value ?? "-")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 
-    <!-- Registered Users -->
-    <div class="col-lg-6">
-      <div class="dash-card h-100">
-        <div class="dash-card-header">
-          <span>Registered Users</span>
-          <span class="count-badge count-blue" id="userCount">0</span>
-        </div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Group</th>
-              <th>VLAN</th>
-            </tr>
-          </thead>
-          <tbody id="userTable">
-            <tr><td colspan="3" class="text-center empty-state">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    async function fetchJson(url, options) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `${url} -> ${response.status}`);
+      }
+      return response.json();
+    }
 
-  </div>
-</div>
+    function formatDate(isoText) {
+      if (!isoText) return "-";
+      const date = new Date(isoText);
+      if (Number.isNaN(date.getTime())) return isoText;
+      return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+    }
 
-<script>
-  const VLAN_MAP = { admin:"10", employee:"20", guest:"30" };
+    function renderStats() {
+      const accepts = state.accessLogs.filter((item) => item.status === "ACCEPT").length;
+      const rejects = state.accessLogs.filter((item) => item.status === "REJECT").length;
+      document.getElementById("statWhitelist").textContent = String(state.whitelist.length);
+      document.getElementById("statSessions").textContent = String(state.sessions.length);
+      document.getElementById("statTelemetry").textContent = String(state.telemetry.length);
+      document.getElementById("statAccept").textContent = String(accepts);
+      document.getElementById("statReject").textContent = String(rejects);
+    }
 
-  function groupBadge(grp) {
-    const cls = { admin:"grp-admin", employee:"grp-employee", guest:"grp-guest" }[grp] || "grp-guest";
-    return `<span class="grp-badge ${cls}">${grp||"guest"}</span>`;
-  }
+    function renderWhitelist() {
+      const tbody = document.getElementById("whitelistTable");
+      document.getElementById("whitelistCount").textContent = `${state.whitelist.length} kayıt`;
+      if (!state.whitelist.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">Whitelist kaydı yok.</td></tr>';
+        return;
+      }
 
-  async function loadSessions() {
-    try {
-      const data = await fetch("/sessions/active").then(r => r.json());
+      tbody.innerHTML = state.whitelist.map((device) => `
+        <tr>
+          <td class="mono">${escapeHtml(device.mac_address)}</td>
+          <td>${escapeHtml(device.description || "-")}</td>
+          <td>
+            <span class="badge ${device.enabled ? "b-ok" : "b-off"}">
+              ${device.enabled ? "enabled" : "disabled"}
+            </span>
+          </td>
+          <td>
+            <button class="btn btn-danger" type="button" onclick="disableDevice('${escapeHtml(device.mac_address)}')">
+              Devre Dışı
+            </button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function renderSessions() {
       const tbody = document.getElementById("sessionTable");
-      document.getElementById("sessionCount").textContent = data.length;
-      document.getElementById("statSessions").textContent  = data.length;
+      document.getElementById("sessionCount").textContent = `${state.sessions.length} kayıt`;
+      if (!state.sessions.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">Aktif oturum yok.</td></tr>';
+        return;
+      }
 
-      tbody.innerHTML = data.length === 0
-        ? '<tr><td colspan="4" class="text-center empty-state">No active sessions</td></tr>'
-        : data.map(s => `
-            <tr>
-              <td><span class="username">${s.username||"—"}</span></td>
-              <td><span class="nas-ip">${s.nas_ip||"—"}</span></td>
-              <td><span class="session-id">${(s.session_id||"").substring(0,14)}…</span></td>
-              <td><span class="status-active"><span class="status-dot"></span>active</span></td>
-            </tr>`).join("");
-    } catch {
-      document.getElementById("sessionTable").innerHTML =
-        '<tr><td colspan="4" class="text-center error-state">⚠ Connection error</td></tr>';
+      tbody.innerHTML = state.sessions.map((session) => `
+        <tr>
+          <td>${escapeHtml(session.username || "-")}</td>
+          <td class="mono">${escapeHtml(session.nas_ip || "-")}</td>
+          <td class="mono">${escapeHtml(session.session_id || "-")}</td>
+          <td><span class="badge b-ok">${escapeHtml(session.status || "active")}</span></td>
+        </tr>
+      `).join("");
     }
-  }
 
-  async function loadUsers() {
-    try {
-      const data = await fetch("/users").then(r => r.json());
-      const tbody = document.getElementById("userTable");
-      document.getElementById("userCount").textContent = data.length;
-      document.getElementById("statUsers").textContent  = data.length;
+    function renderTelemetry() {
+      const tbody = document.getElementById("telemetryTable");
+      document.getElementById("telemetryCount").textContent = `${state.telemetry.length} kayıt`;
+      if (!state.telemetry.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">Telemetri kaydı yok.</td></tr>';
+        return;
+      }
 
-      const groups = new Set(data.map(u=>u.group).filter(Boolean));
-      const vlans  = new Set(data.map(u=>VLAN_MAP[u.group]).filter(Boolean));
-      document.getElementById("statGroups").textContent = groups.size;
-      document.getElementById("statVlans").textContent  = vlans.size;
-
-      tbody.innerHTML = data.length === 0
-        ? '<tr><td colspan="3" class="text-center empty-state">No users found</td></tr>'
-        : data.map(u => `
-            <tr>
-              <td><span class="username">${u.username}</span></td>
-              <td>${groupBadge(u.group)}</td>
-              <td><span class="vlan-badge">VLAN ${VLAN_MAP[u.group]||"30"}</span></td>
-            </tr>`).join("");
-    } catch {
-      document.getElementById("userTable").innerHTML =
-        '<tr><td colspan="3" class="text-center error-state">⚠ Connection error</td></tr>';
+      tbody.innerHTML = state.telemetry.map((item) => `
+        <tr>
+          <td class="mono">${escapeHtml(item.device_mac)}</td>
+          <td>${escapeHtml(item.payload)}</td>
+          <td class="mono">${escapeHtml(item.path || "-")}</td>
+          <td>${formatDate(item.created_at)}</td>
+        </tr>
+      `).join("");
     }
-  }
 
-  function loadAll() {
-    loadSessions();
-    loadUsers();
-    document.getElementById("lastUpdated").textContent =
-      "Updated " + new Date().toLocaleTimeString();
-  }
+    function renderAccessLogs() {
+      const tbody = document.getElementById("accessLogTable");
+      if (!state.accessLogs.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Erişim logu yok.</td></tr>';
+        return;
+      }
 
-  loadAll();
-  setInterval(loadAll, 10000);
-</script>
+      tbody.innerHTML = state.accessLogs.map((item) => `
+        <tr>
+          <td><span class="badge ${item.status === "ACCEPT" ? "b-accept" : "b-reject"}">${escapeHtml(item.status)}</span></td>
+          <td>${escapeHtml(item.source || "-")}</td>
+          <td class="mono">${escapeHtml(item.mac_address || "-")}</td>
+          <td>${escapeHtml(item.reason || "-")}</td>
+          <td>${formatDate(item.created_at)}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function refreshData() {
+      try {
+        const [whitelist, sessions, telemetry, accessLogs] = await Promise.all([
+          fetchJson("/whitelist"),
+          fetchJson("/sessions/active"),
+          fetchJson("/iot/telemetry"),
+          fetchJson("/logs/access")
+        ]);
+
+        state.whitelist = whitelist;
+        state.sessions = sessions;
+        state.telemetry = telemetry;
+        state.accessLogs = accessLogs;
+
+        renderWhitelist();
+        renderSessions();
+        renderTelemetry();
+        renderAccessLogs();
+        renderStats();
+        document.getElementById("lastUpdated").textContent = `Son güncelleme: ${new Date().toLocaleTimeString()}`;
+      } catch (error) {
+        document.getElementById("lastUpdated").textContent = `Veri alınamadı: ${String(error.message || error)}`;
+      }
+    }
+
+    async function disableDevice(macAddress) {
+      if (!macAddress) return;
+      try {
+        await fetchJson(`/whitelist/${encodeURIComponent(macAddress)}`, { method: "DELETE" });
+        await refreshData();
+      } catch (error) {
+        document.getElementById("whitelistFormStatus").textContent = `Silme hatası: ${String(error.message || error)}`;
+      }
+    }
+
+    async function submitWhitelistForm(event) {
+      event.preventDefault();
+      const status = document.getElementById("whitelistFormStatus");
+      status.textContent = "Kaydediliyor...";
+
+      const macAddress = document.getElementById("macAddress").value.trim();
+      const description = document.getElementById("macDescription").value.trim();
+
+      try {
+        await fetchJson("/whitelist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mac_address: macAddress, description: description })
+        });
+
+        status.textContent = `Whitelist güncellendi: ${macAddress}`;
+        document.getElementById("whitelistForm").reset();
+        await refreshData();
+      } catch (error) {
+        status.textContent = `Ekleme hatası: ${String(error.message || error)}`;
+      }
+    }
+
+    async function submitTelemetryForm(event) {
+      event.preventDefault();
+      const status = document.getElementById("telemetryFormStatus");
+      status.textContent = "Gönderiliyor...";
+
+      const deviceMac = document.getElementById("telemetryMac").value.trim();
+      const rawPayload = document.getElementById("telemetryPayload").value;
+      const payload = rawPayload.trim() ? rawPayload.trim() : "no-data";
+
+      try {
+        await fetchJson("/iot/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            device_mac: deviceMac,
+            payload: payload,
+            message_type: "dashboard-test",
+            path: "/telemetry",
+            source_ip: "dashboard"
+          })
+        });
+
+        status.textContent = `Telemetri kabul edildi: ${deviceMac}`;
+        await refreshData();
+      } catch (error) {
+        status.textContent = `Telemetri hatası: ${String(error.message || error)}`;
+      }
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", refreshData);
+    document.getElementById("whitelistForm").addEventListener("submit", submitWhitelistForm);
+    document.getElementById("telemetryForm").addEventListener("submit", submitTelemetryForm);
+
+    window.disableDevice = disableDevice;
+
+    refreshData();
+    setInterval(refreshData, 10000);
+  </script>
 </body>
 </html>

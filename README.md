@@ -127,8 +127,61 @@ echo "User-Name=zeynep,Acct-Status-Type=Stop,Acct-Session-Id=test-101,NAS-IP-Add
 | `/accounting`     | POST   | Saves session data to PostgreSQL         |
 | `/users`          | GET    | Lists users and current status           |
 | `/sessions/active`| GET    | Queries active sessions from Redis       |
+| `/whitelist`      | GET    | Lists whitelisted MAC devices            |
+| `/whitelist`      | POST   | Adds or re-enables a device in whitelist |
+| `/whitelist/{mac}`| DELETE | Soft-disables device from whitelist      |
+| `/logs/access`    | GET    | Lists MAB/PAP access decisions           |
+| `/iot/telemetry`  | POST   | Receives CoAP-forwarded device telemetry |
+| `/iot/telemetry`  | GET    | Lists latest IoT telemetry records       |
 
 **Verify Active Sessions:**
 ```bash
 curl http://localhost:8000/sessions/active
 ```
+
+---
+
+## Cross-Platform Docker Strategy (Linux + macOS M1)
+
+This project uses a hybrid architecture:
+- `Docker`: FreeRADIUS, FastAPI, PostgreSQL, Redis, CoAP Bridge
+- `Host machine`: Cooja, Contiki-NG border-router simulation, optional `tunslip6`
+
+### Linux (x86_64/amd64)
+```bash
+docker compose -f docker-compose.yml -f docker-compose.amd64.yml up -d --build
+```
+
+### macOS M1/M2 (arm64)
+```bash
+docker compose -f docker-compose.yml -f docker-compose.arm64.yml up -d --build
+```
+
+> Note: `nac_radius` runs in `linux/amd64` mode on ARM hosts for maximum compatibility.
+
+---
+
+## CoAP Bridge Integration
+
+CoAP messages are accepted by `nac_coap_bridge` on UDP `5683` and forwarded to FastAPI `POST /iot/telemetry`.
+
+Expected CoAP payload (JSON):
+```json
+{
+  "device_mac": "00:11:22:33:44:55",
+  "payload": "temp=24.7,hum=41",
+  "message_type": "confirmable",
+  "path": "/telemetry",
+  "source_ip": "fd00::212:4b00:abcd:1234"
+}
+```
+
+If payload is plain text, bridge uses demo MAC `00:11:22:33:44:55`.
+
+---
+
+## Simulation Runbook
+
+Detailed Cooja + Border Router + Tunslip6 steps are available in:
+
+- `simulation/README.md`
