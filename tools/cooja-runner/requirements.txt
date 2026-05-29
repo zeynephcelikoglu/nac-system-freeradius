@@ -1,0 +1,6 @@
+fastapi>=0.95
+uvicorn[standard]>=0.22
+aiohttp>=3.8
+
+fastapi[all]==0.95.2
+uvicorn[standard]==0.22.0

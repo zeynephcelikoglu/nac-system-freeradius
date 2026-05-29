@@ -19,7 +19,7 @@ rest {
         uri = "${..connect_uri}/auth"
         method = "post"
         body = "json"
-        data = '{ "username": "%{User-Name}", "password": "%{User-Password}" }'
+        data = '{ "username": "%{User-Name}", "password": "%{User-Password}", "Calling-Station-Id": "%{Calling-Station-Id}" }'
         timeout = 3.0
         tls {
             check_cert = no

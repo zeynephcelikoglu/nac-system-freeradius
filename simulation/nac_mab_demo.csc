@@ -130,4 +130,39 @@
     </plugin_config>
     <bounds x="0" y="0" height="116" width="362" z="4" />
   </plugin>
+  <plugin>
+    org.contikios.cooja.plugins.ScriptRunner
+    <plugin_config>
+      <script>
+/* Emit COAP_SEND log lines periodically for the runner to forward as telemetry.
+   Format: COAP_SEND <MAC> <JSON_PAYLOAD>
+*/
+var seq = 0;
+function macForMote(mote) {
+  var id = mote.getID();
+  var low = ("0" + id).slice(-2);
+  return "00:11:22:33:44:" + low;
+}
+
+function sendOnce() {
+  var motes = simulation.getMotes();
+  seq += 1;
+  for (var i = 0; i < motes.length; i++) {
+    var m = motes[i];
+    var mac = macForMote(m);
+    var payload = { seq: seq, mote: m.getID(), ts: Date.now() };
+    log.log("COAP_SEND " + mac + " " + JSON.stringify(payload));
+  }
+}
+
+while (true) {
+  sendOnce();
+  TIMEOUT(2000);
+  YIELD();
+}
+</script>
+      <active>true</active>
+    </plugin_config>
+    <bounds x="663" y="105" height="525" width="495" />
+  </plugin>
 </simconf>

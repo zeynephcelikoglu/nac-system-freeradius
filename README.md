@@ -185,3 +185,39 @@ If payload is plain text, bridge uses demo MAC `00:11:22:33:44:55`.
 Detailed Cooja + Border Router + Tunslip6 steps are available in:
 
 - `simulation/README.md`
+
+## Development quickstart
+
+For classroom or local development use a slimmed-down compose file and example env file.
+
+1. Start everything with one command:
+
+```bash
+chmod +x scripts/run_all.sh
+./scripts/run_all.sh
+```
+
+2. Start services manually if you prefer:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+3. The API will be available at `http://localhost:8000`.
+
+4. Open the dashboard in your browser. The dashboard and static routes are protected
+  with a simple BasicAuth by default. Use the credentials from `.env.dev` (`admin` / `password`),
+  or set `DISABLE_DASH_AUTH=1` in the environment to disable auth for quick demos.
+
+5. To run the simulated telemetry demo (after adding a device to the whitelist),
+  use the provided script:
+
+```bash
+./scripts/run_demo.sh
+```
+
+Notes:
+- `docker-compose.dev.yml` is intentionally minimal for classroom use.
+- Use `tools/cooja-runner/run.sh` to start/stop the local cooja runner process when available.
+- The first Cooja start may take longer because Gradle downloads its wrapper distribution.
+

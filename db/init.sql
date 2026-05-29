@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS radacct (
 
 -- 2. Performance Optimization
 CREATE INDEX idx_radcheck_username ON radcheck (username);
+CREATE UNIQUE INDEX idx_radcheck_username_attribute ON radcheck (username, attribute);
+CREATE UNIQUE INDEX idx_radusergroup_username_groupname ON radusergroup (username, groupname);
 CREATE INDEX idx_radacct_username ON radacct (username);
 
 -- 3. Authentication (Credentials)

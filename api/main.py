@@ -2,6 +2,9 @@ import os
 import asyncpg
 import bcrypt
 import re
+import asyncio
+import base64
+import secrets
 from redis import asyncio as aioredis
 from fastapi import FastAPI, Request, Response, HTTPException, Query
 from contextlib import asynccontextmanager
@@ -21,6 +24,13 @@ class TelemetryRequest(BaseModel):
     message_type: str = Field(default="coap", max_length=32)
     path: str = Field(default="/telemetry", max_length=128)
     source_ip: str = Field(default="", max_length=64)
+
+
+class DeviceRegisterRequest(BaseModel):
+    device_mac: str = Field(..., description="Device MAC address")
+    device_type: str = Field(default="device", description="Type: phone|pc|iot")
+    username: str = Field(default="", description="Optional auth username for radcheck")
+    group: str = Field(default="guest", description="User group for the device")
 
 
 async def write_access_log(
@@ -51,22 +61,44 @@ async def write_access_log(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize PostgreSQL connection pool
-    app.state.db = await asyncpg.create_pool(os.environ["DATABASE_URL"])
+    # Initialize PostgreSQL connection pool with retries so compose startup is resilient.
+    db_url = os.environ["DATABASE_URL"]
+    last_error = None
+    for _ in range(60):
+        try:
+            app.state.db = await asyncpg.create_pool(db_url)
+            last_error = None
+            break
+        except Exception as exc:
+            last_error = exc
+            await asyncio.sleep(1)
+
+    if last_error is not None:
+        raise last_error
     
     # Initialize Redis connection
     try:
         # Use Docker service name for container networking
         redis_host = os.environ.get("REDIS_HOST", "nac_redis")
         redis_port = os.environ.get("REDIS_PORT", "6379")
-        
+        redis_url = f"redis://{redis_host}:{redis_port}"
+
         app.state.redis = aioredis.from_url(
-            f"redis://{redis_host}:{redis_port}",
+            redis_url,
             encoding="utf-8",
-            decode_responses=True
+            decode_responses=True,
         )
-        # Verify connection
-        await app.state.redis.ping()
+        # Verify connection with retries.
+        redis_ok = False
+        for _ in range(30):
+            try:
+                await app.state.redis.ping()
+                redis_ok = True
+                break
+            except Exception:
+                await asyncio.sleep(1)
+        if not redis_ok:
+            raise RuntimeError(f"Unable to connect to Redis at {redis_url}")
         print(f"REDIS CONNECTED: {redis_host}:{redis_port}")
     except Exception as e:
         print(f"REDIS ERROR: {e}")
@@ -82,6 +114,38 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Simple classroom BasicAuth for the dashboard/static routes.
+# Can be disabled by setting DISABLE_DASH_AUTH=1 in the environment.
+DASH_USER = os.environ.get("DASH_USER", "admin")
+DASH_PASS = os.environ.get("DASH_PASS", "password")
+
+
+def _valid_basic_auth(request: Request) -> bool:
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Basic "):
+        return False
+    try:
+        token = auth.split(" ", 1)[1]
+        decoded = base64.b64decode(token).decode("utf-8", errors="ignore")
+        user, _, pwd = decoded.partition(":")
+    except Exception:
+        return False
+    return secrets.compare_digest(user or "", DASH_USER) and secrets.compare_digest(pwd or "", DASH_PASS)
+
+
+@app.middleware("http")
+async def _dashboard_basic_auth_middleware(request: Request, call_next):
+    # Enforce BasicAuth only for dashboard root and static assets (classroom convenience)
+    if os.environ.get("DISABLE_DASH_AUTH", "0") == "1":
+        return await call_next(request)
+
+    p = request.url.path
+    if p == "/" or p.startswith("/static"):
+        if not _valid_basic_auth(request):
+            return Response(status_code=401, headers={"WWW-Authenticate": "Basic realm=\"Dashboard\""})
+
+    return await call_next(request)
 
 @app.get("/")
 async def index():
@@ -132,18 +196,40 @@ def normalize_mac(value: str) -> str:
     clean = str(value).upper().replace(":", "").replace("-", "")
     return ":".join(clean[i:i+2] for i in range(0, 12, 2))
 
+
+def get_mab_mac(body: dict) -> str:
+    """Pick the strongest MAC identifier from a RADIUS auth payload."""
+    candidate_values = [
+        body.get("Calling-Station-Id"),
+        body.get("calling_station_id"),
+        body.get("Calling-Station-ID"),
+        body.get("username"),
+        body.get("User-Name"),
+        body.get("password"),
+        body.get("User-Password"),
+    ]
+
+    for value in candidate_values:
+        if value and is_mac_address(str(value)):
+            return normalize_mac(str(value))
+
+    return ""
+
 @app.post("/auth")
 async def auth(request: Request):
     body = await request.json()
     username = body.get("username") or body.get("User-Name")
     password = body.get("password") or body.get("User-Password")
+    calling_station_id = body.get("Calling-Station-Id") or body.get("calling_station_id") or body.get("Calling-Station-ID")
     session_id = body.get("Acct-Session-Id", "")
-    auth_source = "mab" if is_mac_address(str(username)) or is_mac_address(str(password)) else "pap"
+    mab_mac = get_mab_mac(body)
+    auth_source = "mab" if mab_mac else "pap"
 
     print(
         f"AUTH INCOMING: user={username!r} source={auth_source} "
         f"is_user_mac={is_mac_address(str(username)) if username else False} "
-        f"is_pass_mac={is_mac_address(str(password)) if password else False}"
+        f"is_pass_mac={is_mac_address(str(password)) if password else False} "
+        f"calling_station_id={calling_station_id!r} mab_mac={mab_mac!r}"
     )
 
     if not username or not password:
@@ -151,9 +237,8 @@ async def auth(request: Request):
         return Response(status_code=401)
 
     # Handle MAC Authentication Bypass (MAB) for IoT devices
-    if is_mac_address(str(username)) or is_mac_address(str(password)):
-        candidate_mac = str(username) if is_mac_address(str(username)) else str(password)
-        mac = normalize_mac(candidate_mac)
+    if mab_mac:
+        mac = mab_mac
         print(f"MAB REQUEST: {mac}")
         async with app.state.db.acquire() as conn:
             row = await conn.fetchrow(
@@ -216,6 +301,81 @@ async def auth(request: Request):
     await write_access_log(str(username), "", "ACCEPT", "password_verified", "pap", str(session_id or ""))
 
     return Response(status_code=200)
+
+
+@app.post("/devices/register", status_code=201)
+async def register_device(item: DeviceRegisterRequest):
+    """Register a generic network device so it can be treated like PCs/phones/IoT.
+
+    This will:
+    - insert into `mac_whitelist`
+    - create a `radcheck` Cleartext-Password entry (username can be provided or MAC)
+    - add a `radusergroup` mapping to the specified group
+    """
+    if not is_mac_address(item.device_mac):
+        raise HTTPException(status_code=400, detail="Invalid MAC address format")
+
+    mac = normalize_mac(item.device_mac)
+    username = item.username.strip() or mac
+
+    async with app.state.db.acquire() as conn:
+        # mac_whitelist upsert
+        await conn.execute(
+            """
+            INSERT INTO mac_whitelist (mac_address, description, enabled)
+            VALUES ($1, $2, TRUE)
+            ON CONFLICT (mac_address) DO UPDATE SET description = EXCLUDED.description, enabled = TRUE
+            """,
+            mac,
+            f"registered:{item.device_type}",
+        )
+
+        # radcheck entry for authentication (Cleartext-Password = MAC by default)
+        await conn.execute(
+            """
+            INSERT INTO radcheck (username, attribute, op, value)
+            VALUES ($1, 'Cleartext-Password', ':=', $2)
+            ON CONFLICT (username, attribute) DO UPDATE SET value = EXCLUDED.value
+            """,
+            username,
+            mac,
+        )
+
+        # Also ensure an entry exists for MAC as username so MAB/RADIUS tests using MAC succeed
+        if username != mac:
+            await conn.execute(
+                """
+                INSERT INTO radcheck (username, attribute, op, value)
+                VALUES ($1, 'Cleartext-Password', ':=', $2)
+                ON CONFLICT (username, attribute) DO UPDATE SET value = EXCLUDED.value
+                """,
+                mac,
+                mac,
+            )
+
+            # and map mac to the same group
+            await conn.execute(
+                """
+                INSERT INTO radusergroup (username, groupname, priority)
+                VALUES ($1, $2, 1)
+                ON CONFLICT (username, groupname) DO NOTHING
+                """,
+                mac,
+                item.group,
+            )
+
+        # radusergroup mapping
+        await conn.execute(
+            """
+            INSERT INTO radusergroup (username, groupname, priority)
+            VALUES ($1, $2, 1)
+            ON CONFLICT (username, groupname) DO NOTHING
+            """,
+            username,
+            item.group,
+        )
+
+    return {"message": "device_registered", "device_mac": mac, "username": username}
 
 def extract(field):
     """
@@ -534,3 +694,48 @@ async def active_sessions():
 
     # Return the list of active sessions as JSON
     return results
+
+
+@app.post("/simulate", status_code=202)
+async def run_simulation(count: int = 3, interval_ms: int = 500, device_mac: str = "00:11:22:33:44:55"):
+    """Run a quick simulated telemetry burst for demo purposes.
+
+    This endpoint inserts `count` telemetry rows for `device_mac` with a short delay
+    between them so the dashboard can show live updates without running Cooja.
+    """
+    if not is_mac_address(device_mac):
+        raise HTTPException(status_code=400, detail="Invalid MAC address format")
+
+    mac = normalize_mac(device_mac)
+
+    async with app.state.db.acquire() as conn:
+        device = await conn.fetchrow(
+            "SELECT id FROM mac_whitelist WHERE mac_address = $1 AND enabled = TRUE",
+            mac,
+        )
+
+        if not device:
+            await write_access_log(mac, mac, "REJECT", "simulation_from_untrusted_device", "simulation")
+            raise HTTPException(status_code=403, detail="Device not whitelisted")
+
+        sent = 0
+        for i in range(int(count)):
+            payload = '{"seq": %d, "temp": %.1f}' % (i + 1, 20.0 + (i * 0.5))
+            await conn.execute(
+                """
+                INSERT INTO iot_telemetry (device_mac, payload, message_type, path, source_ip)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                mac,
+                payload,
+                "simulation",
+                "/telemetry",
+                "simulation",
+            )
+
+            await write_access_log(mac, mac, "ACCEPT", "simulated_telemetry", "simulation")
+            sent += 1
+            if interval_ms and i < int(count) - 1:
+                await asyncio.sleep(interval_ms / 1000.0)
+
+    return {"message": "simulation_sent", "sent": sent, "device_mac": mac}

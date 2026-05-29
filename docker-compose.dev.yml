@@ -1,0 +1,79 @@
+services:
+  nac_db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: nac_admin
+      POSTGRES_PASSWORD: nac_pass
+      POSTGRES_DB: nac_db
+    volumes:
+      - db_data_dev:/var/lib/postgresql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    # No host port binding for Postgres in dev compose to avoid conflicts with local DB
+
+  nac_redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  nac_api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    env_file:
+      - .env.dev
+    depends_on:
+      - nac_db
+      - nac_redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/static:/app/static:ro
+
+  nac_coap_bridge:
+    build:
+      context: ./coap-bridge
+      dockerfile: Dockerfile
+    env_file:
+      - .env.dev
+    depends_on:
+      - nac_api
+
+  cooja_runner:
+    build:
+      context: ./tools/cooja-runner
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/workspace
+      - ./tools/cooja-runner:/app:ro
+    working_dir: /app
+    command: ["uvicorn", "runner:app", "--host", "0.0.0.0", "--port", "5001"]
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env.dev
+    environment:
+      COOJA_DIR: /workspace/simulation/contiki-ng/tools/cooja
+      JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
+      PATH: /usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    depends_on:
+      - nac_api
+  nac_radius:
+    build:
+      context: .
+      dockerfile: Dockerfile.radius
+    env_file:
+      - .env.dev
+    volumes:
+      - ./radius/config/mods-enabled:/etc/freeradius/mods-enabled:ro
+      - ./radius/config/sites-available:/etc/freeradius/sites-available:ro
+      - ./radius/config/policy.d:/etc/freeradius/policy.d:ro
+      - ./radius/config/certs:/etc/freeradius/certs:ro
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    depends_on:
+      - nac_api
+      - nac_db
+
+volumes:
+  db_data_dev:
