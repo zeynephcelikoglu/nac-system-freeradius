@@ -279,8 +279,8 @@
         <span>IoT NAC Control Center</span>
       </div>
       <div class="toolbar">
-        <span id="lastUpdated">Son güncelleme: -</span>
-        <button class="btn" id="refreshBtn" type="button">Yenile</button>
+        <span id="lastUpdated">Last updated: -</span>
+        <button class="btn" id="refreshBtn" type="button">Refresh</button>
       </div>
     </div>
   </header>
@@ -288,8 +288,8 @@
   <main>
     <section class="stats">
       <article class="stat"><div class="stat-label">Whitelist</div><div class="stat-value" id="statWhitelist">0</div></article>
-      <article class="stat"><div class="stat-label">Aktif Oturum</div><div class="stat-value" id="statSessions">0</div></article>
-      <article class="stat"><div class="stat-label">Telemetri</div><div class="stat-value" id="statTelemetry">0</div></article>
+      <article class="stat"><div class="stat-label">Active Sessions</div><div class="stat-value" id="statSessions">0</div></article>
+      <article class="stat"><div class="stat-label">Telemetry</div><div class="stat-value" id="statTelemetry">0</div></article>
       <article class="stat"><div class="stat-label">Accept</div><div class="stat-value" id="statAccept">0</div></article>
       <article class="stat"><div class="stat-label">Reject</div><div class="stat-value" id="statReject">0</div></article>
     </section>
@@ -297,31 +297,31 @@
     <section class="layout">
       <div class="stack">
         <article class="card">
-          <div class="card-head"><span>Whitelist Cihazları</span><span id="whitelistCount">0 kayıt</span></div>
+          <div class="card-head"><span>Whitelisted Devices</span><span id="whitelistCount">0 records</span></div>
           <div class="card-body table-wrap">
             <table>
-              <thead><tr><th>MAC</th><th>Açıklama</th><th>Durum</th><th>İşlem</th></tr></thead>
-              <tbody id="whitelistTable"><tr><td colspan="4" class="empty">Yükleniyor...</td></tr></tbody>
+              <thead><tr><th>MAC</th><th>Description</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="whitelistTable"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
             </table>
           </div>
         </article>
 
         <article class="card">
-          <div class="card-head"><span>Canlı RADIUS Oturumları</span><span id="sessionCount">0 kayıt</span></div>
+          <div class="card-head"><span>Live RADIUS Sessions</span><span id="sessionCount">0 records</span></div>
           <div class="card-body table-wrap">
             <table>
-              <thead><tr><th>Cihaz/Kullanıcı</th><th>NAS IP</th><th>Session</th><th>Durum</th></tr></thead>
-              <tbody id="sessionTable"><tr><td colspan="4" class="empty">Yükleniyor...</td></tr></tbody>
+              <thead><tr><th>Device/User</th><th>NAS IP</th><th>Session</th><th>Status</th></tr></thead>
+              <tbody id="sessionTable"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
             </table>
           </div>
         </article>
 
         <article class="card">
-          <div class="card-head"><span>IoT Telemetri (CoAP Forward)</span><span id="telemetryCount">0 kayıt</span></div>
+          <div class="card-head"><span>IoT Telemetry (CoAP Forward)</span><span id="telemetryCount">0 records</span></div>
           <div class="card-body table-wrap">
             <table>
-              <thead><tr><th>MAC</th><th>Payload</th><th>Path</th><th>Zaman</th></tr></thead>
-              <tbody id="telemetryTable"><tr><td colspan="4" class="empty">Yükleniyor...</td></tr></tbody>
+              <thead><tr><th>MAC</th><th>Payload</th><th>Path</th><th>Time</th></tr></thead>
+              <tbody id="telemetryTable"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
             </table>
           </div>
         </article>
@@ -329,7 +329,7 @@
 
       <div class="stack">
         <article class="card">
-          <div class="card-head"><span>Yeni IoT Cihaz Whitelist</span></div>
+          <div class="card-head"><span>Add Device to Whitelist</span></div>
           <div class="card-body">
             <form id="whitelistForm">
               <div class="form-grid">
@@ -338,25 +338,25 @@
                   <input id="macAddress" placeholder="AA:BB:CC:DD:EE:FF" required />
                 </div>
                 <div class="field">
-                  <label for="macDescription">Açıklama</label>
+                  <label for="macDescription">Description</label>
                   <input id="macDescription" placeholder="Cooja Sensor Node" />
                 </div>
               </div>
               <div style="margin-top:10px;display:flex;gap:8px;">
-                <button class="btn btn-primary" type="submit">Whiteliste Ekle</button>
+                <button class="btn btn-primary" type="submit">Add to Whitelist</button>
               </div>
             </form>
-            <div class="hint">MAC formatı `00:11:22:33:44:55` veya `001122334455` olabilir.</div>
+            <div class="hint">MAC format: `00:11:22:33:44:55` or `001122334455`.</div>
             <div class="status-line" id="whitelistFormStatus"></div>
           </div>
         </article>
 
         <article class="card">
-          <div class="card-head"><span>Telemetri Test Gönderimi</span></div>
+          <div class="card-head"><span>Send Test Telemetry</span></div>
           <div class="card-body">
             <form id="telemetryForm">
               <div class="field">
-                <label for="telemetryMac">Cihaz MAC</label>
+                <label for="telemetryMac">Device MAC</label>
                 <input id="telemetryMac" value="00:11:22:33:44:55" required />
               </div>
               <div class="field" style="margin-top:8px;">
@@ -364,7 +364,7 @@
                 <textarea id="telemetryPayload">{"temp": 24.4, "hum": 42, "battery": 93}</textarea>
               </div>
               <div style="margin-top:10px;display:flex;gap:8px;">
-                <button class="btn" type="submit">API'ye Telemetri Gönder</button>
+                <button class="btn" type="submit">Send Telemetry</button>
               </div>
             </form>
             <div class="status-line" id="telemetryFormStatus"></div>
@@ -372,44 +372,44 @@
         </article>
 
           <article class="card">
-            <div class="card-head"><span>Simülasyonu Çalıştır</span></div>
+            <div class="card-head"><span>Run Simulation</span></div>
             <div class="card-body">
               <div class="field">
-                <label for="simCount">Gönderilecek Mesaj Sayısı</label>
+                <label for="simCount">Number of Messages</label>
                 <input id="simCount" type="number" value="3" min="1" />
               </div>
               <div class="field" style="margin-top:8px;">
-                <label for="simInterval">Mesajlar Arası (ms)</label>
+                <label for="simInterval">Interval Between Messages (ms)</label>
                 <input id="simInterval" type="number" value="500" min="0" />
               </div>
               <div style="margin-top:10px;display:flex;gap:8px;">
-                <button class="btn btn-primary" id="runSimBtn">Simülasyonu Başlat</button>
+                <button class="btn btn-primary" id="runSimBtn">Start Simulation</button>
               </div>
               <div class="status-line" id="simStatus"></div>
             </div>
           </article>
 
         <article class="card">
-          <div class="card-head"><span>Erişim Kararları (MAB/PAP)</span></div>
+          <div class="card-head"><span>Access Decisions (MAB/PAP)</span></div>
           <div class="card-body table-wrap">
             <table>
-              <thead><tr><th>Durum</th><th>Kaynak</th><th>MAC</th><th>Neden</th><th>Zaman</th></tr></thead>
-              <tbody id="accessLogTable"><tr><td colspan="5" class="empty">Yükleniyor...</td></tr></tbody>
+              <thead><tr><th>Status</th><th>Source</th><th>MAC</th><th>Reason</th><th>Time</th></tr></thead>
+              <tbody id="accessLogTable"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
             </table>
           </div>
         </article>
 
         <article class="card">
-          <div class="card-head"><span>Cihaz Kayıt (Genel)</span></div>
+          <div class="card-head"><span>Register Device</span></div>
           <div class="card-body">
             <form id="registerForm">
               <div class="form-grid">
                 <div class="field">
-                  <label for="regMac">MAC Adresi</label>
+                  <label for="regMac">MAC Address</label>
                   <input id="regMac" placeholder="AA:BB:CC:DD:EE:FF" required />
                 </div>
                 <div class="field">
-                  <label for="regType">Cihaz Tipi</label>
+                  <label for="regType">Device Type</label>
                   <select id="regType" style="width:100%;background:#0d1524;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 10px;font-family:inherit;font-size:13px;">
                     <option value="iot">IoT</option>
                     <option value="phone">Phone</option>
@@ -418,11 +418,11 @@
                   </select>
                 </div>
                 <div class="field">
-                  <label for="regUsername">Kullanıcı Adı (opsiyonel)</label>
-                  <input id="regUsername" placeholder="Boş bırakılırsa MAC kullanılır" />
+                  <label for="regUsername">Username (optional)</label>
+                  <input id="regUsername" placeholder="Leave blank to use MAC as username" />
                 </div>
                 <div class="field">
-                  <label for="regGroup">Grup</label>
+                  <label for="regGroup">Group</label>
                   <select id="regGroup" style="width:100%;background:#0d1524;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 10px;font-family:inherit;font-size:13px;">
                     <option value="guest">Guest (VLAN 30)</option>
                     <option value="employee">Employee (VLAN 20)</option>
@@ -431,7 +431,7 @@
                 </div>
               </div>
               <div style="margin-top:10px;display:flex;gap:8px;">
-                <button class="btn btn-primary" type="submit">Cihazı Kayıt Et</button>
+                <button class="btn btn-primary" type="submit">Register Device</button>
               </div>
             </form>
             <div class="status-line" id="registerFormStatus"></div>
@@ -439,15 +439,15 @@
         </article>
 
         <article class="card">
-          <div class="card-head"><span>Cooja Kontrolleri</span></div>
+          <div class="card-head"><span>Cooja Controls</span></div>
           <div class="card-body">
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-primary" id="coojaStartBtn">Cooja Başlat (GUI)</button>
-              <button class="btn" id="coojaStartHeadlessBtn">Cooja Başlat (Headless)</button>
-              <button class="btn btn-danger" id="coojaStopBtn">Cooja Durdur</button>
+              <button class="btn btn-primary" id="coojaStartBtn">Start Cooja (GUI)</button>
+              <button class="btn" id="coojaStartHeadlessBtn">Start Cooja (Headless)</button>
+              <button class="btn btn-danger" id="coojaStopBtn">Stop Cooja</button>
             </div>
             <div style="margin-top:10px;">
-              <div class="status-line" id="coojaStatus">Durum: bilinmiyor</div>
+              <div class="status-line" id="coojaStatus">Status: unknown</div>
               <div style="margin-top:8px;max-height:220px;overflow:auto;background:#071226;padding:8px;border-radius:6px;border:1px solid #23314a;" id="coojaLogBox"></div>
             </div>
           </div>
