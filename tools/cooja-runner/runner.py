@@ -91,7 +91,7 @@ async def _attach_reader(proc: asyncio.subprocess.Process) -> None:
 
 
 @app.post("/start")
-async def start_cooja(gui: bool = True):
+async def start_cooja(gui: bool = True, csc_path: Optional[str] = None):
     """Start Cooja. If gui=False will run headless (--no-gui)."""
     global _proc
     if _proc and _proc.returncode is None:
@@ -101,9 +101,28 @@ async def start_cooja(gui: bool = True):
         _log_buffer.append(f"[SYSTEM] Cooja directory not found: {COOJA_DIR}")
         raise HTTPException(status_code=500, detail=f"Cooja directory not found: {COOJA_DIR}")
 
+    # Search for a .csc file under /workspace/simulation or /workspace if not provided
+    if not csc_path:
+        workspace_dir = "/workspace"
+        sim_dir = os.path.join(workspace_dir, "simulation")
+        if os.path.isdir(sim_dir):
+            csc_files = [f for f in os.listdir(sim_dir) if f.endswith(".csc")]
+            if csc_files:
+                csc_path = os.path.join(sim_dir, csc_files[0])
+        if not csc_path and os.path.isdir(workspace_dir):
+            csc_files = [f for f in os.listdir(workspace_dir) if f.endswith(".csc")]
+            if csc_files:
+                csc_path = os.path.join(workspace_dir, csc_files[0])
+
     cmd = ["./gradlew", "run"]
+    args_list = []
     if not gui:
-        cmd = ["./gradlew", "run", "--no-gui"]
+        args_list.append("--no-gui")
+    if csc_path:
+        args_list.append(csc_path)
+
+    if args_list:
+        cmd.append(f"--args={' '.join(args_list)}")
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -112,7 +131,7 @@ async def start_cooja(gui: bool = True):
         stderr=asyncio.subprocess.PIPE,
     )
 
-    _log_buffer.append(f"[SYSTEM] Started Cooja (pid={proc.pid}) gui={gui}")
+    _log_buffer.append(f"[SYSTEM] Started Cooja (pid={proc.pid}) gui={gui} csc_path={csc_path}")
     await _attach_reader(proc)
 
     _proc = proc

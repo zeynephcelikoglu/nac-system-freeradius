@@ -78,6 +78,26 @@
           <id>2</id>
         </interface_config>
       </mote>
+      <mote>
+        <interface_config>
+          org.contikios.cooja.interfaces.Position
+          <pos x="24.51547441385902" y="69.70369194669861" />
+        </interface_config>
+        <interface_config>
+          org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+          <id>3</id>
+        </interface_config>
+      </mote>
+      <mote>
+        <interface_config>
+          org.contikios.cooja.interfaces.Position
+          <pos x="34.51547441385902" y="79.70369194669861" />
+        </interface_config>
+        <interface_config>
+          org.contikios.cooja.contikimote.interfaces.ContikiMoteID
+          <id>4</id>
+        </interface_config>
+      </mote>
     </motetype>
   </simulation>
   <plugin>
@@ -133,10 +153,13 @@
   <plugin>
     org.contikios.cooja.plugins.ScriptRunner
     <plugin_config>
-      <script>
+      <script><![CDATA[
 /* Emit COAP_SEND log lines periodically for the runner to forward as telemetry.
    Format: COAP_SEND <MAC> <JSON_PAYLOAD>
 */
+TIMEOUT(10000000000); /* Large timeout so simulation doesn't quit */
+sim.setSpeedLimit(1.0); /* Limit simulation speed to real-time (1.0) */
+
 var seq = 0;
 function macForMote(mote) {
   var id = mote.getID();
@@ -145,22 +168,24 @@ function macForMote(mote) {
 }
 
 function sendOnce() {
-  var motes = simulation.getMotes();
+  var motes = sim.getMotes();
   seq += 1;
   for (var i = 0; i < motes.length; i++) {
     var m = motes[i];
     var mac = macForMote(m);
     var payload = { seq: seq, mote: m.getID(), ts: Date.now() };
-    log.log("COAP_SEND " + mac + " " + JSON.stringify(payload));
+    var logMsg = "COAP_SEND " + mac + " " + JSON.stringify(payload);
+    log.log(logMsg + "\n");
+    java.lang.System.out.println(logMsg);
   }
 }
 
 while (true) {
   sendOnce();
-  TIMEOUT(2000);
-  YIELD();
+  GENERATE_MSG(2000, "continue");
+  YIELD_THEN_WAIT_UNTIL(msg.equals("continue"));
 }
-</script>
+      ]]></script>
       <active>true</active>
     </plugin_config>
     <bounds x="663" y="105" height="525" width="495" />

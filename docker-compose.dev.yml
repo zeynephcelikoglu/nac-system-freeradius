@@ -42,9 +42,13 @@ services:
     build:
       context: ./tools/cooja-runner
       dockerfile: Dockerfile
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     volumes:
       - ./:/workspace
       - ./tools/cooja-runner:/app:ro
+      - /home/baris/.gradle:/root/.gradle
     working_dir: /app
     command: ["uvicorn", "runner:app", "--host", "0.0.0.0", "--port", "5001"]
     ports:
@@ -55,6 +59,7 @@ services:
       COOJA_DIR: /workspace/simulation/contiki-ng/tools/cooja
       JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
       PATH: /usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      API_URL: http://nac_api:8000
     depends_on:
       - nac_api
   nac_radius:
