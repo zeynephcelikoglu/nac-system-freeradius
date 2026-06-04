@@ -92,6 +92,26 @@ services:
     networks:
       - nac_net
 
+  cooja_runner:
+    container_name: nac_cooja_runner
+    build:
+      context: ./tools/cooja-runner
+      dockerfile: Dockerfile
+    command: ["uvicorn", "runner:app", "--host", "0.0.0.0", "--port", "5001"]
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./:/workspace
+      - ./tools/cooja-runner:/app:ro
+    environment:
+      - COOJA_DIR=/workspace/simulation/contiki-ng/tools/cooja
+      - API_URL=http://nac_api:8000
+    depends_on:
+      nac_api:
+        condition: service_healthy
+    networks:
+      - nac_net
+
 networks:
   nac_net:
     driver: bridge

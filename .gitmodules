@@ -1,0 +1,4 @@
+[submodule "simulation/contiki-ng"]
+	path = simulation/contiki-ng
+	url = https://github.com/contiki-ng/contiki-ng.git
+	branch = develop

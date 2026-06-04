@@ -5,12 +5,16 @@ import re
 import asyncio
 import base64
 import secrets
+import httpx
 from redis import asyncio as aioredis
 from fastapi import FastAPI, Request, Response, HTTPException, Query
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
+
+# Cooja runner URL — override via env for different deployments
+COOJA_RUNNER_URL = os.environ.get("COOJA_RUNNER_URL", "http://nac_cooja_runner:5001")
 
 
 class WhitelistRequest(BaseModel):
@@ -739,3 +743,56 @@ async def run_simulation(count: int = 3, interval_ms: int = 500, device_mac: str
                 await asyncio.sleep(interval_ms / 1000.0)
 
     return {"message": "simulation_sent", "sent": sent, "device_mac": mac}
+
+
+# ---------------------------------------------------------------------------
+# Cooja Runner proxy — forwards calls to the cooja_runner container so the
+# browser never needs to hit port 5001 directly (avoids CORS issues).
+# ---------------------------------------------------------------------------
+
+_cooja_client = httpx.AsyncClient(timeout=10.0)
+
+
+def _cooja_response(r: httpx.Response):
+    """Forward cooja_runner response, handling non-JSON bodies gracefully."""
+    try:
+        content = r.json()
+    except Exception:
+        content = {"detail": r.text or f"cooja_runner returned HTTP {r.status_code}"}
+    return JSONResponse(content=content, status_code=r.status_code)
+
+
+@app.get("/cooja/status")
+async def cooja_status():
+    try:
+        r = await _cooja_client.get(f"{COOJA_RUNNER_URL}/status")
+        return _cooja_response(r)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Cooja runner unreachable: {exc}")
+
+
+@app.get("/cooja/logs")
+async def cooja_logs(tail: int = Query(default=200, ge=1, le=2000)):
+    try:
+        r = await _cooja_client.get(f"{COOJA_RUNNER_URL}/logs", params={"tail": tail})
+        return _cooja_response(r)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Cooja runner unreachable: {exc}")
+
+
+@app.post("/cooja/start")
+async def cooja_start(gui: bool = Query(default=False)):
+    try:
+        r = await _cooja_client.post(f"{COOJA_RUNNER_URL}/start", params={"gui": str(gui).lower()})
+        return _cooja_response(r)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Cooja runner unreachable: {exc}")
+
+
+@app.post("/cooja/stop")
+async def cooja_stop():
+    try:
+        r = await _cooja_client.post(f"{COOJA_RUNNER_URL}/stop")
+        return _cooja_response(r)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Cooja runner unreachable: {exc}")
