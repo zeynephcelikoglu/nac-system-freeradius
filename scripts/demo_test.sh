@@ -96,6 +96,26 @@ HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${API}/auth" \
 [ "$HTTP" = "200" ] && ok "HTTP $HTTP — ACCEPT (device now whitelisted)" || fail "HTTP $HTTP — Unexpected response"
 
 # ════════════════════════════════════════════════════════════
+# SCENARIO 3 — IoT Telemetry (CoAP Ingestion) Flow
+# ════════════════════════════════════════════════════════════
+sep
+echo -e "${BLUE}SCENARIO 3: IoT Telemetry (CoAP Ingestion) Flow${NC}"
+
+step "3a) Telemetry — Untrusted device (${MALICIOUS_MAC}) is disabled → REJECT expected"
+# Make sure MALICIOUS_MAC is disabled first
+curl -s -o /dev/null -X DELETE "${API}/whitelist/${MALICIOUS_MAC}" || true
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${API}/iot/telemetry" \
+  -H 'Content-Type: application/json' \
+  -d "{\"device_mac\":\"${MALICIOUS_MAC}\",\"payload\":\"temp=27.2\"}")
+[ "$HTTP" = "403" ] && ok "HTTP $HTTP — FORBIDDEN/REJECT" || fail "HTTP $HTTP — Unexpected response"
+
+step "3b) Telemetry — Whitelisted device (${LEGIT_MAC}) → ACCEPT expected"
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${API}/iot/telemetry" \
+  -H 'Content-Type: application/json' \
+  -d "{\"device_mac\":\"${LEGIT_MAC}\",\"payload\":\"temp=24.5\"}")
+[ "$HTTP" = "202" ] && ok "HTTP $HTTP — ACCEPTED" || fail "HTTP $HTTP — Unexpected response"
+
+# ════════════════════════════════════════════════════════════
 # SUMMARY — Access Log
 # ════════════════════════════════════════════════════════════
 sep

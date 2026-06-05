@@ -137,6 +137,64 @@ for l in json.load(sys.stdin):
 
 ---
 
+## Scenario 3 — IoT Telemetry (CoAP Ingest Flow)
+
+This scenario tests the ingestion of sensor telemetry data (simulating CoAP packets forwarded to the API). Only whitelisted devices are allowed to submit telemetry.
+
+### 3a. Untrusted device → `403 Forbidden`
+
+Attempt to send telemetry from a rogue MAC `00:11:22:33:44:04` (which is not whitelisted or disabled):
+
+```bash
+curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+  -X POST http://localhost:8000/iot/telemetry \
+  -H 'Content-Type: application/json' \
+  -d '{"device_mac":"00:11:22:33:44:04","payload":"temp=27.2"}'
+```
+
+**Expected:** `HTTP 403`
+
+---
+
+### 3b. Trusted device → `202 Accepted`
+
+Send telemetry from a whitelisted MAC `00:11:22:33:44:01`:
+
+```bash
+curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+  -X POST http://localhost:8000/iot/telemetry \
+  -H 'Content-Type: application/json' \
+  -d '{"device_mac":"00:11:22:33:44:01","payload":"temp=24.5"}'
+```
+
+**Expected:** `HTTP 202`
+
+---
+
+### 3c. Real background Cooja-triggered telemetry simulation
+
+To test the end-to-end simulation flow where Contiki-NG motes running in Cooja periodically generate telemetry and send them through the border router:
+
+1. **Verify or start Cooja in headless mode:**
+   ```bash
+   curl -s -X POST "http://localhost:8000/cooja/start?gui=false"
+   ```
+
+2. **Watch the live output log stream:**
+   ```bash
+   curl -s "http://localhost:8000/cooja/logs?tail=20" | python3 -m json.tool
+   ```
+
+   * **Whitelisted nodes** (`mote_1`, `mote_2`, `mote_3` i.e. `00:11:22:33:44:01-03`) will show `[SYSTEM] Forwarded telemetry`.
+   * **Disabled nodes** (like `00:11:22:33:44:04`) will show `[SYSTEM] Telemetry forward failed 403: {"detail":"Device not whitelisted"}`.
+
+3. **Stop the background simulation runner:**
+   ```bash
+   curl -s -X POST "http://localhost:8000/cooja/stop"
+   ```
+
+---
+
 ## Bonus — Disable a Whitelisted Device
 
 Remove a device from the whitelist (NAC will REJECT it on next attempt):

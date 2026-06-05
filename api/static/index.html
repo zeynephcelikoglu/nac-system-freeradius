@@ -499,9 +499,9 @@
 
     function renderWhitelist() {
       const tbody = document.getElementById("whitelistTable");
-      document.getElementById("whitelistCount").textContent = `${state.whitelist.length} kayıt`;
+      document.getElementById("whitelistCount").textContent = `${state.whitelist.length} records`;
       if (!state.whitelist.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty">Whitelist kaydı yok.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No whitelist entries.</td></tr>';
         return;
       }
 
@@ -516,7 +516,7 @@
           </td>
           <td>
             <button class="btn btn-danger" type="button" onclick="disableDevice('${escapeHtml(device.mac_address)}')">
-              Devre Dışı
+              Disable
             </button>
           </td>
         </tr>
@@ -525,9 +525,9 @@
 
     function renderSessions() {
       const tbody = document.getElementById("sessionTable");
-      document.getElementById("sessionCount").textContent = `${state.sessions.length} kayıt`;
+      document.getElementById("sessionCount").textContent = `${state.sessions.length} records`;
       if (!state.sessions.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty">Aktif oturum yok.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No active sessions.</td></tr>';
         return;
       }
 
@@ -543,9 +543,9 @@
 
     function renderTelemetry() {
       const tbody = document.getElementById("telemetryTable");
-      document.getElementById("telemetryCount").textContent = `${state.telemetry.length} kayıt`;
+      document.getElementById("telemetryCount").textContent = `${state.telemetry.length} records`;
       if (!state.telemetry.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty">Telemetri kaydı yok.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No telemetry records.</td></tr>';
         return;
       }
 
@@ -562,7 +562,7 @@
     function renderAccessLogs() {
       const tbody = document.getElementById("accessLogTable");
       if (!state.accessLogs.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty">Erişim logu yok.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No access logs.</td></tr>';
         return;
       }
 
@@ -596,9 +596,9 @@
         renderTelemetry();
         renderAccessLogs();
         renderStats();
-        document.getElementById("lastUpdated").textContent = `Son güncelleme: ${new Date().toLocaleTimeString()}`;
+        document.getElementById("lastUpdated").textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
       } catch (error) {
-        document.getElementById("lastUpdated").textContent = `Veri alınamadı: ${String(error.message || error)}`;
+        document.getElementById("lastUpdated").textContent = `Failed to fetch data: ${String(error.message || error)}`;
       }
     }
 
@@ -608,14 +608,14 @@
         await fetchJson(`/whitelist/${encodeURIComponent(macAddress)}`, { method: "DELETE" });
         await refreshData();
       } catch (error) {
-        document.getElementById("whitelistFormStatus").textContent = `Silme hatası: ${String(error.message || error)}`;
+        document.getElementById("whitelistFormStatus").textContent = `Delete error: ${String(error.message || error)}`;
       }
     }
 
     async function submitWhitelistForm(event) {
       event.preventDefault();
       const status = document.getElementById("whitelistFormStatus");
-      status.textContent = "Kaydediliyor...";
+      status.textContent = "Saving...";
 
       const macAddress = document.getElementById("macAddress").value.trim();
       const description = document.getElementById("macDescription").value.trim();
@@ -627,18 +627,18 @@
           body: JSON.stringify({ mac_address: macAddress, description: description })
         });
 
-        status.textContent = `Whitelist güncellendi: ${macAddress}`;
+        status.textContent = `Whitelist updated: ${macAddress}`;
         document.getElementById("whitelistForm").reset();
         await refreshData();
       } catch (error) {
-        status.textContent = `Ekleme hatası: ${String(error.message || error)}`;
+        status.textContent = `Add error: ${String(error.message || error)}`;
       }
     }
 
     async function submitTelemetryForm(event) {
       event.preventDefault();
       const status = document.getElementById("telemetryFormStatus");
-      status.textContent = "Gönderiliyor...";
+      status.textContent = "Sending...";
 
       const deviceMac = document.getElementById("telemetryMac").value.trim();
       const rawPayload = document.getElementById("telemetryPayload").value;
@@ -657,10 +657,10 @@
           })
         });
 
-        status.textContent = `Telemetri kabul edildi: ${deviceMac}`;
+        status.textContent = `Telemetry accepted: ${deviceMac}`;
         await refreshData();
       } catch (error) {
-        status.textContent = `Telemetri hatası: ${String(error.message || error)}`;
+        status.textContent = `Telemetry error: ${String(error.message || error)}`;
       }
     }
 
@@ -672,7 +672,7 @@
     async function submitRegisterForm(event) {
       event.preventDefault();
       const status = document.getElementById("registerFormStatus");
-      status.textContent = "Kaydediliyor...";
+      status.textContent = "Saving...";
 
       const deviceMac  = document.getElementById("regMac").value.trim();
       const deviceType = document.getElementById("regType").value;
@@ -685,11 +685,11 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ device_mac: deviceMac, device_type: deviceType, username, group })
         });
-        status.textContent = `Kayıt başarılı: ${res.device_mac} (${res.username})`;
+        status.textContent = `Registration successful: ${res.device_mac} (${res.username})`;
         document.getElementById("registerForm").reset();
         await refreshData();
       } catch (error) {
-        status.textContent = `Kayıt hatası: ${String(error.message || error)}`;
+        status.textContent = `Registration error: ${String(error.message || error)}`;
       }
     }
     function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
@@ -698,13 +698,13 @@
       const status = document.getElementById("simStatus");
       const simBtn = document.getElementById("runSimBtn");
       simBtn.disabled = true;
-      status.textContent = "Hazırlanıyor...";
+      status.textContent = "Preparing...";
       const count = Number(document.getElementById("simCount").value) || 3;
       const interval = Number(document.getElementById("simInterval").value) || 500;
 
       // 1) Start Cooja via local runner and wait until running
       try {
-        status.textContent = "Cooja başlatılıyor (GUI)...";
+        status.textContent = "Starting Cooja (GUI)...";
         await fetch(`${COOJA_RUNNER}/start?gui=true`, { method: 'POST' });
 
         // poll status up to 30s; if GUI fails, fallback to headless
@@ -719,7 +719,7 @@
 
         if (!ready) {
           // try headless fallback
-          status.textContent = "GUI başlatılamadı, headless modda başlatılıyor...";
+          status.textContent = "GUI failed to start, starting in headless mode...";
           try {
             await fetch(`${COOJA_RUNNER}/start?gui=false`, { method: 'POST' });
           } catch(e) { /* ignore */ }
@@ -733,15 +733,15 @@
         }
 
         if (!ready) {
-          throw new Error('Cooja başlatılamadı veya zaman aşımı');
+          throw new Error('Cooja failed to start or timed out');
         }
 
-        status.textContent = "Cooja çalışıyor — simülasyon gönderiliyor...";
+        status.textContent = "Cooja running — sending simulation...";
         // small delay to let Cooja fully initialize
         await sleep(800);
 
       } catch (err) {
-        status.textContent = `Cooja hatası: ${String(err.message || err)}`;
+        status.textContent = `Cooja error: ${String(err.message || err)}`;
         simBtn.disabled = false;
         return;
       }
@@ -752,10 +752,10 @@
           method: "POST"
         });
 
-        status.textContent = `Gönderildi: ${res.sent} mesaj (${res.device_mac})`;
+        status.textContent = `Sent: ${res.sent} messages (${res.device_mac})`;
         await refreshData();
       } catch (err) {
-        status.textContent = `Simülasyon hatası: ${String(err.message || err)}`;
+        status.textContent = `Simulation error: ${String(err.message || err)}`;
       } finally {
         simBtn.disabled = false;
       }
@@ -785,7 +785,7 @@
 
     function _coojaCircuitOpen() {
       const statusEl = document.getElementById("coojaStatus");
-      statusEl.textContent = "Durum: Cooja Runner çalışmıyor (port 5001) — polling durduruldu";
+      statusEl.textContent = "Status: Cooja Runner not running (port 5001) — polling stopped";
       statusEl.style.color = "var(--warn)";
       if (_coojaStatusInterval) { clearInterval(_coojaStatusInterval); _coojaStatusInterval = null; }
       if (_coojaLogsInterval)   { clearInterval(_coojaLogsInterval);   _coojaLogsInterval   = null; }
@@ -798,14 +798,14 @@
         const data = await res.json();
         _coojaFailCount = 0; // reset on success
         document.getElementById("coojaStatus").textContent =
-          `Durum: ${data.running ? 'Çalışıyor (pid=' + data.pid + ')' : 'Durduruldu'}`;
+          `Status: ${data.running ? 'Running (pid=' + data.pid + ')' : 'Stopped'}`;
         document.getElementById("coojaStatus").style.color = "";
       } catch {
         _coojaFailCount++;
         if (_coojaFailCount >= COOJA_MAX_FAIL) {
           _coojaCircuitOpen();
         } else {
-          document.getElementById("coojaStatus").textContent = `Durum: ulaşılamıyor`;
+          document.getElementById("coojaStatus").textContent = `Status: unreachable`;
         }
       }
     }
@@ -837,7 +837,7 @@
         await updateCoojaStatus();
         setTimeout(fetchCoojaLogs, 1000);
       } catch (err) {
-        alert('Cooja başlatılamadı: ' + err.message);
+        alert('Could not start Cooja: ' + err.message);
       }
     });
 
@@ -846,7 +846,7 @@
         await _coojaFetch(`${COOJA_RUNNER}/stop`, { method: 'POST' });
         await updateCoojaStatus();
       } catch (err) {
-        alert('Cooja durdurulamadı: ' + err.message);
+        alert('Could not stop Cooja: ' + err.message);
       }
     });
 
